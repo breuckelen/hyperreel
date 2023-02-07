@@ -115,10 +115,6 @@ class LightfieldDataset(Base5DDataset):
                 idx = t_idx * self.cols + s_idx
                 image_path = self.image_paths[idx]
 
-                print(image_path)
-                print(self.all_coords[0][0])
-                exit()
-
                 # Color
                 self.all_rgb += [self.get_rgb(s_idx, t_idx)]
 

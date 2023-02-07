@@ -13,6 +13,8 @@ from PIL import Image
 from .base import Base5DDataset
 from utils.pose_utils import (
     correct_poses_bounds,
+    transform_poses_pca,
+    generate_ellipse_path
 )
 from utils.ray_utils import (
     get_rays,
@@ -73,21 +75,34 @@ class LLFFDataset(Base5DDataset):
         self.K[1, 2] = self.cy * self.img_wh[1] / H
 
         # Step 2: correct poses, bounds
-        self.poses, self.poses_avg, self.bounds = correct_poses_bounds(
-            poses, self.bounds
-        )
-
-        if not self.use_ndc:
-            self.bounds = self.bounds / np.max(np.abs(poses[..., :3, 3]))
+        if self.use_ndc:
+            self.poses, self.poses_avg, self.bounds = correct_poses_bounds(
+                poses, self.bounds
+            )
+        else:
+            self.poses, self.poses_avg = transform_poses_pca(
+                poses
+            )
+            #self.poses, self.poses_avg, self.bounds = correct_poses_bounds(
+            #    poses, self.bounds
+            #)
 
         self.near = self.bounds.min() * 0.95
         self.far = self.bounds.max() * 1.05
         self.depth_range = np.array([self.near * 2.0, self.far])
 
         # Step 3: Ray directions for all pixels
-        self.directions = get_ray_directions_K(
-            self.img_wh[1], self.img_wh[0], self.K, centered_pixels=True
-        )
+        if self.use_ndc:
+            self.directions = get_ray_directions_K(
+                self.img_wh[1], self.img_wh[0], self.K, centered_pixels=True
+            )
+        else:
+            self.directions = get_ray_directions_K(
+                self.img_wh[1], self.img_wh[0], self.K, centered_pixels=True, flipped=False, negate=False
+            )
+
+            #self.directions = self.directions.view(-1, 3)
+            #self.directions = np.matmul(self.directions, np.diag(np.array([1.0, -1.0, -1.0]))).float()
 
         # Step 4: Holdout validation images
         if len(self.val_set) > 0:
@@ -114,6 +129,14 @@ class LLFFDataset(Base5DDataset):
             self.camera_ids = self.camera_ids[train_indices]
             self.poses = self.poses[train_indices]
 
+    def prepare_render_data(self):
+        if self.use_ndc:
+            super().prepare_render_data()
+        else:
+            self.poses = generate_ellipse_path(
+                np.copy(self.poses), n_frames=120
+            )
+
     def get_intrinsics(self):
         return self.K
 
@@ -135,11 +158,21 @@ class LLFFDataset(Base5DDataset):
 
         rays = torch.cat([rays_o, rays_d], dim=-1)
 
+        # Convert to NDC
         if self.use_ndc:
+            rays_no_ndc = rays
             rays = self.to_ndc(rays)
+        else:
+            rays_no_ndc = rays
         
         # Add camera idx
         rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * camera_id], dim=-1)
+
+        ## Additional
+        #rays = torch.cat([rays, rays_no_ndc], dim=-1)
+        #directions = self.directions.view(-1, 3)
+        #rays = torch.cat([rays, directions[..., -1:]], dim=-1)
+
         return rays
 
     def get_rgb(self, idx):

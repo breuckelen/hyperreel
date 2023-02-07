@@ -1,18 +1,18 @@
 # @package _group_
 
 name: llff
-collection: vasedeck
+collection: counter
 data_subdir: nerf_real_360
 root_dir: "${experiment.params.data_dir}/${experiment.dataset.data_subdir}/${experiment.dataset.collection}/"
 
-img_wh: [504, 378]
+img_wh: None
+downsample: 2
 spherical_poses: True
 use_ndc: False
 centered_pixels: True
 
-val_num: 1000
-val_skip: inf
-val_all: True
+val_num: 8
+val_skip: 8
 
 render_params:
   interpolate: False

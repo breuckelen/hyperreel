@@ -9,6 +9,7 @@ import time
 
 from typing import Dict
 
+import cv2
 import numpy as np
 import torch
 import torch.nn
@@ -124,6 +125,49 @@ class TensorVMNoSample(TensorVMSplit):
             line_coef_point
         )
         return self.basis_mat((plane_coef_point * line_coef_point).T)
+    
+    def write_layers(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        gridSize = (500, 500, 128)
+
+        for i in range(gridSize[2]):
+            samples = torch.stack(
+                torch.meshgrid(
+                    torch.linspace(0.25, 0.75, gridSize[0]),
+                    torch.linspace(0.25, 0.75, gridSize[1]),
+                    #torch.linspace(0.75, 0.25, gridSize[1]),
+                    torch.linspace(0, 1, gridSize[2])[i:i+1],
+                ),
+                -1,
+            ).to(self.device)
+            dense_xyz = self.aabb[0] * (1 - samples) + self.aabb[1] * samples
+            cur_xyz = dense_xyz.view(-1, 3)
+
+            cur_viewdirs = torch.zeros_like(cur_xyz)
+            cur_viewdirs[..., -1] = 1.0
+
+            app_features = self.compute_appfeature(cur_xyz)
+            cur_rgb = self.renderModule(
+                cur_xyz, cur_viewdirs, app_features, {}
+            )
+
+            cur_sigma = self.compute_densityfeature(cur_xyz)
+            cur_sigma, _, _ = raw2alpha(cur_sigma.view(-1, 1), 0.25)
+
+            cur_sigma = cur_sigma.clamp(0.0, 1.0)
+            cur_sigma = cur_sigma.view(gridSize[0], gridSize[1]).permute(1, 0)
+
+            cur_rgb = cur_rgb.clamp(0.0, 1.0)
+            cur_rgb = cur_rgb.view(gridSize[0], gridSize[1], 3).permute(1, 0, 2) * cur_sigma.view(gridSize[0], gridSize[1], 1)
+
+            cur_rgb = np.uint8(np.array(cur_rgb.detach().cpu()) * 255.0)
+            cur_rgb = cv2.cvtColor(cur_rgb, cv2.COLOR_BGR2RGB)
+            cur_sigma = np.uint8(np.array(cur_sigma.detach().cpu()) * 255.0)
+
+            print(f'Writing tmp/{i}')
+            cv2.imwrite(f'tmp/rgb/{i}.png', cur_rgb)
+            cv2.imwrite(f'tmp/density/{i}.png', cur_sigma)
+
+        exit()
 
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         # Batch size

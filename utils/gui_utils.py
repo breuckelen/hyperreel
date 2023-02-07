@@ -94,6 +94,12 @@ class NeRFGUI:
             fovy = 60
             radius = -1.0
             self.pan_factor = 0.1
+        elif 'llff' in self.system.cfg.dataset.name:
+            fovy = 30
+            self.pan_factor = 0.1
+        elif 'shiny' in self.system.cfg.dataset.name:
+            fovy = 30
+            self.pan_factor = 0.1
         else:
             self.pan_factor = 1.0
 

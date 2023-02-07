@@ -6,7 +6,7 @@
 
 CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_llff \
     experiment/training=stanford_tensorf \
-    experiment.training.val_every=5 \
+    experiment.training.val_every=1 \
     experiment.training.render_every=5 \
     experiment.training.ckpt_every=20 \
     experiment.training.test_every=20 \

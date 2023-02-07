@@ -1,13 +1,14 @@
 # @package _group_
 
 name: eikonal
-collection: Pen
+collection: pen
 data_subdir: eikonal
 root_dir: "${experiment.params.data_dir}/${experiment.dataset.data_subdir}/${experiment.dataset.collection}/"
 
 img_wh: [672, 504]
 spherical_poses: False
 use_ndc: False
+#correct_poses: True
 
 num_views: -1
 val_num: 1000

@@ -556,12 +556,14 @@ class ImmersiveDataset(Base6DDataset):
 
         # Convert to world space
         rays_o, rays_d = get_rays(directions, c2w)
+        rays = torch.cat([rays_o, rays_d], dim=-1)
 
         # Convert to NDC
         if self.use_ndc:
-            rays = self.to_ndc(torch.cat([rays_o, rays_d], dim=-1))
+            rays_no_ndc = rays
+            rays = self.to_ndc(rays)
         else:
-            rays = torch.cat([rays_o, rays_d], dim=-1)
+            rays_no_ndc = rays
 
         # Add camera idx
         rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * camera_id], dim=-1)
@@ -569,7 +571,11 @@ class ImmersiveDataset(Base6DDataset):
         # Add times
         rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * time], dim=-1)
 
-        # Return
+        ## Additional
+        #rays = torch.cat([rays, rays_no_ndc], dim=-1)
+        #directions = directions.view(-1, 3)
+        #rays = torch.cat([rays, directions[..., -1:]], dim=-1)
+
         return rays
 
     def get_rgb(self, img):

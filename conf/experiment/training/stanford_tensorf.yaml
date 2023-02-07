@@ -21,10 +21,16 @@ flush_logs: 1000
 num_workers: 16
 num_gpus: 1
 
+#multiscale: False
+#scales: [2, 1]
+#scale_epochs: [0, 50]
+#scale_batch_sizes: [4096, 32768]
+
 multiscale: False
-scales: [2, 1]
-scale_epochs: [0, 50]
-scale_batch_sizes: [4096, 32768]
+scales: [16, 4, 1]
+scale_batch_sizes: [16384, 16384, 16384]
+scale_lrs: [1.0, 1.0, 1.0]
+scale_epochs: [0, 1, 2]
 
 weight_init:
   type: none
@@ -40,7 +46,7 @@ num_epochs: 40
 optimizers:
   color:
     optimizer: adam
-    lr: 0.005
+    lr: 0.02
     clip: False
     clip_amount: 1.0
     momentum: 0.9
@@ -91,7 +97,7 @@ optimizers:
 
   embedding_impl:
     optimizer: adam
-    lr: 0.001
+    lr: 0.00075
     clip: False
     clip_amount: 1.0
     momentum: 0.9

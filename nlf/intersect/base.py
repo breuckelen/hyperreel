@@ -239,6 +239,8 @@ class Intersect(nn.Module):
             )
 
         # Contract
+        dists_no_contract = dists
+
         if not (self.cur_iter > self.contract_stop_iters):
             points, dists = self.contract_fn.contract_points_and_distance(
                 rays[..., :3], points, dists
@@ -254,6 +256,7 @@ class Intersect(nn.Module):
         # Return
         x['points'] = points
         x['distances'] = dists
+        x['distances_no_contract'] = dists_no_contract
         x['z_vals'] = z_vals
 
         return x

@@ -30,23 +30,6 @@ embedding:
             direction_multiplier: 1.0
             moment_multiplier: 1.0
 
-          #param:
-          #  fn: contract_points
-
-          #  param:
-          #    n_dims: 6
-          #    fn: pluecker
-          #    direction_multiplier: 1.0
-          #    moment_multiplier: 1.0
-
-          #  contract:
-          #    type: mipnerf
-          #    contract_samples: True
-          #    use_dataset_bounds: True
-          #  
-          #  contract_start_channel: 3
-          #  contract_end_channel: 6
-
           pe:
             type: windowed
             freq_multiplier: 2.0

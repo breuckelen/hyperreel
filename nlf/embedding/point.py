@@ -151,7 +151,7 @@ class PointPredictionEmbedding(nn.Module):
             elif inp_name == 'origins':
                 inputs.append(rays[..., None, 0:3].repeat(1, points.shape[1], 1))
             elif inp_name == 'times':
-                inputs.append(rays[..., None, -1:].repeat(1, points.shape[1], 1))
+                inputs.append(rays[..., None, 7:8].repeat(1, points.shape[1], 1))
             else:
                 inputs.append(x[inp_name][..., :self.input_shapes[inp_idx]])
 
@@ -780,7 +780,7 @@ class AdvectPointsEmbedding(nn.Module):
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         rays = x[self.rays_name]
         points = x[self.in_points_field]
-        t = rays[..., -1:]
+        t = rays[..., 7:8]
 
         if self.save_points_field is not None:
             x[self.save_points_field] = points
@@ -858,13 +858,54 @@ class AddPointOutputsEmbedding(nn.Module):
         rays = x[self.rays_name]
 
         if 'times' in self.extra_outputs and 'times' not in x:
-            x['times'] = rays[..., None, -1:].repeat(1, x['points'].shape[1], 1)
+            x['times'] = rays[..., None, 7:8].repeat(1, x['points'].shape[1], 1)
 
         if 'base_times' in self.extra_outputs and 'base_times' not in x:
-            x['base_times'] = rays[..., None, -1:].repeat(1, x['points'].shape[1], 1)
+            x['base_times'] = rays[..., None, 7:8].repeat(1, x['points'].shape[1], 1)
 
         if 'viewdirs' in self.extra_outputs and 'viewdirs' not in x:
             x['viewdirs'] = rays[..., None, 3:6].repeat(1, x['points'].shape[1], 1)
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class ConvertDistanceEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.datasets = [kwargs['system'].dm.train_dataset]
+
+        # Rays
+        self.rays_name = cfg.rays_name if 'rays_name' in cfg else 'rays'
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        # Get rays
+        rays = x[self.rays_name][..., -7:-1]
+        rays_z = x[self.rays_name][..., -1:]
+
+        # Get distances
+        distances = x['distances_no_contract']
+
+        # Convert distances
+        if self.datasets[0].use_ndc:
+            converted_distances = from_ndc(distances, rays[..., None, :], -self.datasets[0].near)
+        else:
+            converted_distances = distances
+
+        x['converted_distances'] = converted_distances * torch.abs(rays_z[..., None, :])
+
+        #print(distances[0], converted_distances[0])
 
         return x
 
@@ -886,4 +927,5 @@ point_embedding_dict = {
     'reflect': ReflectEmbedding,
     'advect_points': AdvectPointsEmbedding,
     'add_point_outputs': AddPointOutputsEmbedding,
+    'convert_distance': ConvertDistanceEmbedding,
 }

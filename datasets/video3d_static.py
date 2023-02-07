@@ -28,6 +28,7 @@ from utils.ray_utils import (
     get_ndc_rays_fx_fy,
     get_pixels_for_image,
     get_ray_directions_K,
+    get_ray_directions_panorama,
     get_rays,
     sample_images_at_xy,
 )
@@ -94,6 +95,7 @@ class Video3DDataset(Base5DDataset):
         self.near = 0.75
         self.far = 4.0
         self.bounds = np.array([self.near, self.far])
+        self.depth_range = np.array([2 * self.near, self.far])
 
         ## Correct poses, bounds
         if self.use_ndc or self.correct_poses:
@@ -200,7 +202,16 @@ class Video3DDataset(Base5DDataset):
 
     def get_coords(self, idx):
         c2w = torch.FloatTensor(self.poses[idx])
-        rays_o, rays_d = get_rays(self.directions, c2w)
+
+        if self.use_panorama:
+            self._img_wh = [1800, 400]
+            self.img_wh = [1800, 400]
+            directions = get_ray_directions_panorama(
+                400, 1800
+            )
+            rays_o, rays_d = get_rays(directions, c2w)
+        else:
+            rays_o, rays_d = get_rays(self.directions, c2w)
 
         if self.use_ndc:
             return self.to_ndc(torch.cat([rays_o, rays_d], dim=-1))
@@ -209,6 +220,8 @@ class Video3DDataset(Base5DDataset):
 
     def get_rgb(self, idx):
         image_path = self.image_paths[idx]
+
+        print("Loading image:", idx)
 
         with self.pmgr.open(
             os.path.join(self.root_dir, "images", image_path), "rb"

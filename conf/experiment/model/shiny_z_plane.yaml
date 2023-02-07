@@ -172,7 +172,6 @@ embedding:
       type: extract_fields
       fields: ['points', 'distances', 'viewdirs', 'weights', 'color_scale', 'color_shift']
 
-
 ### COLOR ###
 color:
   type: base

@@ -1,0 +1,48 @@
+# @package _group_
+
+name: video3d_time
+collection: agent
+data_subdir: blender_open_movies
+root_dir: "${experiment.params.data_dir}/${experiment.dataset.data_subdir}/${experiment.dataset.collection}/"
+
+img_wh: [1280, 720]
+spherical_poses: False
+use_ndc: False
+correct_poses: True
+
+# Validation
+val_num: 8
+val_skip: 2
+val_set: 'lightfield'
+
+val_all: False
+
+lightfield_step: 2
+lightfield_rows: 9
+lightfield_cols: 90
+
+#val_all: False
+#val_set: [0]
+
+# Video
+start_frame: 0
+num_frames: 50
+keyframe_step: 4
+
+#load_full_step: 8
+#subsample_keyframe_step: 4
+#subsample_keyframe_frac: 0.25
+#subsample_frac: 0.125
+
+load_full_step: 8
+subsample_keyframe_step: 4
+subsample_keyframe_frac: 0.25
+subsample_frac: 0.125
+
+# Render
+render_params:
+  interpolate_time: False
+  interpolate: False
+  supersample: 2
+  crop: 1.0
+

@@ -175,6 +175,8 @@ class IntersectEuclideanDistanceUnified(Intersect):
             torch.sign(dot(rays_d, diff)) * torch.norm(diff, dim=-1)
         ).unsqueeze(1)
 
+        distance = distance / torch.norm(rays_d[..., None, :], dim=-1)
+
         return distance
 
 
@@ -534,6 +536,8 @@ class IntersectSphereNew(Intersect):
         base_pos = self.unify_fn(rays)
         diff = (base_pos - rays[..., :3])
         base_distance = torch.sign(dot(rays[..., 3:6], diff)) * torch.norm(diff, dim=-1)
+
+        #print(base_distance[0])
 
         t = torch.where(
             torch.abs(radii) < min_radius + 4 * self.z_scale,

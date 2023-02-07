@@ -127,9 +127,13 @@ class Video3DTimeDataset(Base6DDataset):
             self.poses += [pose]
 
             # Time
-            self.times.append(
-                (frame - self.start_frame) / (self.num_frames - 1)
-            )
+            if self.num_frames > 1:
+                self.times.append(
+                    (frame - self.start_frame) / (self.num_frames - 1)
+                )
+            else:
+                self.times.append(0.0)
+
             self.frames.append(frame - self.start_frame)
 
         self.poses = np.stack(self.poses, axis=0)
@@ -165,13 +169,12 @@ class Video3DTimeDataset(Base6DDataset):
 
             for row in range(rows):
                 for col in range(cols):
-                    idx = row * rows + col
+                    idx = row * cols + col
 
                     if row % step != 0 or col % step != 0 or ([row, col] in self.val_pairs):
                         val_indices += [frame * self.images_per_frame + idx for frame in range(self.num_frames)]
 
-            if self.val_num > 0:
-                val_indices = val_indices[:self.val_num]
+            val_indices = [idx for idx in val_indices if idx < len(self.image_paths)]
 
         elif len(self.val_set) > 0:
             val_indices = self.val_set

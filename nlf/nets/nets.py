@@ -32,6 +32,14 @@ for k, v in tensorf_reflect_dict.items(): net_dict[k] = v
 from .tensorf_dynamic import tensorf_dynamic_dict
 for k, v in tensorf_dynamic_dict.items(): net_dict[k] = v
 
+# Add NGP
+from .ngp_base import ngp_base_dict
+for k, v in ngp_base_dict.items(): net_dict[k] = v
+
+# Add NeRF
+from .nerf_base import nerf_base_dict
+for k, v in nerf_base_dict.items(): net_dict[k] = v
+
 # Multiple net
 class MultipleNet(nn.Module):
     def __init__(

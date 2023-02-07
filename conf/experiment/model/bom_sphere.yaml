@@ -242,8 +242,8 @@ color:
     alpha_mask_thre: 1e-3
 
     # Tensor sizes
-    n_lamb_sigma: [8,4,4]
-    n_lamb_sh: [8,4,4]
+    n_lamb_sigma: [8,8,8]
+    n_lamb_sh: [8,8,8]
 
     # Shading
     #shadingMode: SH

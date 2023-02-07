@@ -105,6 +105,9 @@ class EmbeddingVisualizer(BaseVisualizer):
         data_outputs, vis_outputs = self.validation(batch, batch_idx)
         outputs = {}
 
+        for key in data_outputs.keys():
+            outputs[f'data/{key}'] = data_outputs[key]
+
         for key in vis_outputs.keys():
             outputs[f'videos/embedding_{key}'] = vis_outputs[key]
 

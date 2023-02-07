@@ -5,8 +5,8 @@
 # LICENSE file in the root directory of this source tree.
 
 CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_large \
-    experiment/training=technicolor_tensorf \
-    experiment.training.val_every=10 \
+    experiment/training=stanford_tensorf \
+    experiment.training.val_every=1 \
     experiment.training.ckpt_every=20 \
     experiment.training.test_every=20 \
     experiment.training.render_every=50 \

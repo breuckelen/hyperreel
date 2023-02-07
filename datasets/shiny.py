@@ -32,8 +32,6 @@ class ShinyDataset(LLFFDataset):
         split='train',
         **kwargs
         ):
-        self.dense = cfg.dataset.collection == 'cd' or cfg.dataset.collection == 'lab'
-
         super().__init__(cfg, split, **kwargs)
 
     def read_meta(self):
@@ -54,6 +52,8 @@ class ShinyDataset(LLFFDataset):
         )
         self.camera_ids = np.linspace(0, len(self.image_paths) - 1, len(self.image_paths))
         self.total_num_views = len(self.image_paths)
+
+        self.dense = len(self.image_paths) > 80
 
         if self.img_wh is None:
             image_path = self.image_paths[0]
@@ -145,7 +145,7 @@ class ShinyDataset(LLFFDataset):
             focus_depth = mean_dz
 
             if self.dense:
-                radii = np.percentile(np.abs(self.poses[..., 3]), 50, axis=0)
+                radii = np.percentile(np.abs(self.poses[..., 3]), 65, axis=0)
                 self.poses = create_spiral_poses(self.poses, radii, focus_depth * 100)
             else:
                 radii = np.percentile(np.abs(self.poses[..., 3]), 85, axis=0)

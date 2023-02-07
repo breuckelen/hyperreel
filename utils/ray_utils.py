@@ -96,7 +96,7 @@ def get_random_pixels(
     return grid
 
 def get_ray_directions_from_pixels_K(
-    grid, K, centered_pixels=False, flipped=False
+    grid, K, centered_pixels=False, flipped=False, negate=False
 ):
     i, j = grid.unbind(-1)
 
@@ -107,16 +107,40 @@ def get_ray_directions_from_pixels_K(
         [
             (i - K[0, 2] + offset_x) / K[0, 0],
             (-(j - K[1, 2] + offset_y) / K[1, 1]) if not flipped else (j - K[1, 2] + offset_y) / K[1, 1],
-            -torch.ones_like(i)
+            torch.ones_like(i) if negate else -torch.ones_like(i)
         ],
         -1
     )
 
     return directions
 
-def get_ray_directions_K(H, W, K, centered_pixels=False, flipped=False, device='cpu'):
+def get_ray_directions_K(H, W, K, centered_pixels=False, flipped=False, negate=False, device='cpu'):
     grid = create_meshgrid(H, W, normalized_coordinates=False, device=device)[0]
-    return get_ray_directions_from_pixels_K(grid, K, centered_pixels, flipped=flipped)
+    return get_ray_directions_from_pixels_K(grid, K, centered_pixels, flipped=flipped, negate=negate)
+
+def get_ray_directions_panorama(H, W, device='cpu'):
+    grid = create_meshgrid(H, W, normalized_coordinates=False, device=device)[0]
+    i, j = grid.unbind(-1)
+
+    offset_x = 0.5
+    offset_y = 0.5
+
+    y = (-(j - H / 2 + offset_y) / H) * 0.75
+
+    theta = ((i + offset_x)  / W) * 2 * np.pi
+    x = torch.cos(theta)
+    z = torch.sin(theta)
+
+    directions = torch.stack(
+        [
+            x,
+            y,
+            z
+        ],
+        -1
+    )
+
+    return directions
 
 def get_rays(directions, c2w, normalize=True):
     # Implementation: https://github.com/kwea123/nerf_pl

@@ -1,0 +1,15 @@
+# @package _group_
+
+type: embedding
+
+run_on_test: False
+save_data: True
+
+data_fields: ['converted_distances']
+no_over_fields: []
+
+fields:
+  converted_distances:
+    use_abs: False
+    normalize: True
+

@@ -12,7 +12,7 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=blender_open_movies \
     experiment.training.ckpt_every=10 \
     experiment.training.test_every=100 \
     experiment.training.num_epochs=30 \
-    experiment/model=bom_cylinder \
+    experiment/model=bom_sphere \
     experiment.params.print_loss=True \
     experiment.dataset.collection=$2 \
     +experiment/regularizers/tensorf=tv_4000 \

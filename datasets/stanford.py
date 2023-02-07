@@ -46,6 +46,18 @@ class StanfordLightfieldDataset(LightfieldDataset):
                 idx = t_idx * self.cols + s_idx
                 coord = self.normalize_coord(self.camera_coords[idx])
                 self.poses.append(coord)
+        
+
+        # Scale of ST plane relative to UV plane
+        st_scale_dict = {
+            'tarot': 0.125,
+        }
+
+        self.st_scale = st_scale_dict.get(cfg.dataset.collection, 0.125)
+
+        # Near, far plane locations
+        self.near_plane = cfg.dataset.near if 'near' in cfg.dataset else -1.0
+        self.far_plane = cfg.dataset.far if 'far' in cfg.dataset else 0.0
 
     def read_meta(self):
         self.image_paths = sorted(
@@ -275,7 +287,7 @@ class StanfordLLFFDataset(LLFFDataset):
 
         # Scale of ST plane relative to UV plane
         st_scale_dict = {
-            'tarot': 0.125,
+            'tarot': 0.25,
             'tarot_small': 0.125,
             'knights': 0.125,
             'bracelet': 0.125,

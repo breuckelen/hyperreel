@@ -18,4 +18,3 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_large \
     experiment.params.name=stanford_$2_step_1_small \
     experiment.params.render_only=True
 
-

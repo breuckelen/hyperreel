@@ -76,10 +76,15 @@ def intersect_sphere(rays, origin, radius, continuous=False):
     )
 
     t = torch.where(
-        (t2 < 0) | (radius < 0),
+        (t2 < 0) | (radius > 0),
         t1,
         t2
     )
+    #t = torch.where(
+    #    (radius > 0),
+    #    t1,
+    #    t2
+    #)
 
     return t
 

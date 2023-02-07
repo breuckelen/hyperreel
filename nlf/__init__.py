@@ -878,17 +878,28 @@ class INRSystem(LightningModule):
                 for key in all_videos:
                     cur_im = np.squeeze(all_videos[key])
                     vid_suffix = key.split('/')[-1]
+                    vid_prefix = key.split('/')[-2]
 
                     self.pmgr.mkdirs(os.path.join(save_video_dir, vid_suffix))
 
-                    with self.pmgr.open(
-                        os.path.join(save_video_dir, vid_suffix, f'{idx:04d}.png'),
-                        'wb'
-                    ) as f:
-                        if len(cur_im.shape) == 3:
-                            Image.fromarray(to8b(cur_im.transpose(1, 2, 0))).save(f)
-                        else:
-                            Image.fromarray(to8b(cur_im)).save(f)
+                    if vid_prefix == 'data':
+                        with self.pmgr.open(
+                            os.path.join(save_video_dir, vid_suffix, f'{idx:04d}.npy'),
+                            'wb'
+                        ) as f:
+                            if len(cur_im.shape) == 3:
+                                np.save(f, cur_im.transpose(1, 2, 0))
+                            else:
+                                np.save(f, cur_im)
+                    else:
+                        with self.pmgr.open(
+                            os.path.join(save_video_dir, vid_suffix, f'{idx:04d}.png'),
+                            'wb'
+                        ) as f:
+                            if len(cur_im.shape) == 3:
+                                Image.fromarray(to8b(cur_im.transpose(1, 2, 0))).save(f)
+                            else:
+                                Image.fromarray(to8b(cur_im)).save(f)
 
         print("Average time:", np.mean(all_times[1:-1]))
 

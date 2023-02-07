@@ -177,7 +177,7 @@ class TechnicolorDataset(Base6DDataset):
 
             for row in range(rows):
                 for col in range(cols):
-                    idx = row * rows + col
+                    idx = row * cols + col
 
                     if (row % step != 0 or col % step != 0 or ([row, col] in self.val_pairs)) and not self.val_all:
                         val_indices += [frame * self.images_per_frame + idx for frame in range(self.num_frames)]
