@@ -132,6 +132,7 @@ embedding:
         use_disparity: False
 
         use_sigma: True
+        #use_sigma: False
 
         out_points: raw_points
         out_distance: raw_distance
@@ -150,6 +151,7 @@ embedding:
       type: point_offset
       in_density_field: point_sigma
       use_sigma: True
+      #use_sigma: False
 
     add_point_outputs_0:
       type: add_point_outputs
@@ -171,6 +173,7 @@ color:
     black_bg: 0
 
     aabb: [-2.0, -2.0, -2.0, 2.0, 2.0, 2.0]
+    #aabb: [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]
 
     num_dim: 3
 
@@ -192,6 +195,9 @@ color:
     window_epochs: 4
 
     n_window_levels: 8
+    #n_window_levels: 4
+
+    window_discrete: False
 
     #n_levels: 16
     n_levels: 16
@@ -205,3 +211,4 @@ color:
 
     #log2_hashmap_size: 19
     log2_hashmap_size: 16
+    #log2_hashmap_size: 14

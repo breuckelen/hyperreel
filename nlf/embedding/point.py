@@ -351,7 +351,7 @@ class PointOffsetEmbedding(nn.Module):
         self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
 
         self.in_offset_field = cfg.in_offset_field if 'in_offset_field' in cfg else 'point_offset'
-        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else 'offset'
+        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else 'point_offset'
 
         self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
         self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else 'points'

@@ -145,6 +145,7 @@ class NGPRadianceField(torch.nn.Module):
 
         if self.window_iters > 0:
             self.n_window_levels = cfg.n_window_levels
+            self.window_discrete = cfg.window_discrete
             self.window_iters_single = self.window_iters // self.n_window_levels
             self.window_iters_list = np.arange(0, self.window_iters, self.window_iters_single)
 
@@ -162,7 +163,7 @@ class NGPRadianceField(torch.nn.Module):
     
     def window_features(self, feat):
         if self.window_iters == 0 or self.n_window_levels == 0 \
-            or self.cur_iter >= self.window_iters_list[-1]:
+            or self.cur_iter >= self.window_iters_list[-1] + self.window_iters_single:
             return feat
 
         feat_split = torch.split(feat, 2 * self.n_levels // self.n_window_levels , dim=-1)
@@ -170,15 +171,18 @@ class NGPRadianceField(torch.nn.Module):
 
         for l, cur_feat in enumerate(feat_split[1:]):
             window_start = self.window_iters_list[l+1]
-            window_end = window_start + self.window_iters_single
+            #window_start = 0
+            window_end = self.window_iters_list[l+1] + self.window_iters_single
+            window_iters = window_end - window_start
 
             if self.cur_iter >= window_end:
                 w = 1.0
             elif self.cur_iter <= window_start:
                 w = 0.0
+            elif self.window_discrete:
+                w = 0.0
             else:
-                w = min(max(float(self.cur_iter - window_start) / self.window_iters_single, 0.0), 1.0)
-                #w = 1.0
+                w = min(max(float(self.cur_iter - window_start) / window_iters, 0.0), 1.0)
             
             new_features.append(w * cur_feat)
         

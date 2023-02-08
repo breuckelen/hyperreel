@@ -478,12 +478,15 @@ class StanfordLLFFDataset(LLFFDataset):
             dt = .75
             mean_dz = 1./(((1.-dt)/close_depth + dt/inf_depth))
             focus_depth = mean_dz
+            #focus_depth = mean_dz * 100
 
             radii = np.percentile(
                 np.abs(self.poses[..., 3] - np.mean(self.poses[..., 3], axis=0)),
                 50,
                 axis=0
             )
+            #radii[0] = radii[0] * 4.0
+            #radii[1] = radii[1] * 0.1
             self.poses = create_spiral_poses(self.poses, radii, focus_depth * 4)
 
             self.poses = np.stack(self.poses, axis=0)

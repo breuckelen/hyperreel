@@ -157,7 +157,7 @@ embedding:
 
     extract_fields:
       type: extract_fields
-      fields: ['points', 'distances', 'viewdirs', 'weights', 'color_scale', 'color_shift']
+      fields: ['point_offset', 'points', 'distances', 'viewdirs', 'weights', 'color_scale', 'color_shift']
 
 
 ### COLOR ###

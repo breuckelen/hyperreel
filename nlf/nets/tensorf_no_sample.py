@@ -9,11 +9,14 @@ import time
 
 from typing import Dict
 
+import os
 import cv2
 import numpy as np
 import torch
 import torch.nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+
 from torch import autograd
 
 from utils.sh_utils import eval_sh_bases
@@ -128,6 +131,8 @@ class TensorVMNoSample(TensorVMSplit):
     
     def write_layers(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         gridSize = (500, 500, 128)
+        os.makedirs('tmp/rgb', exist_ok=True)
+        os.makedirs('tmp/density', exist_ok=True)
 
         for i in range(gridSize[2]):
             samples = torch.stack(
@@ -169,7 +174,121 @@ class TensorVMNoSample(TensorVMSplit):
 
         exit()
 
+    def write_layers_perspective(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        #gridSize = (512, 512, 32)
+        gridSize = (301, 403, 32)
+
+        batch_size = x["viewdirs"].shape[0]
+        nSamples = x["points"].shape[-1] // 3
+        points = x["points"].reshape(batch_size, nSamples, 3)
+
+        os.makedirs('tmp/rgb_perspective', exist_ok=True)
+        os.makedirs('tmp/density_perspective', exist_ok=True)
+
+        for i in range(nSamples):
+            print(i)
+            samples = self.normalize_coord(points[..., i, :])
+            cur_xyz = samples.view(-1, 3)
+
+            cur_viewdirs = torch.zeros_like(cur_xyz)
+            cur_viewdirs[..., -1] = 1.0
+
+            app_features = self.compute_appfeature(cur_xyz)
+            cur_rgb = self.renderModule(
+                cur_xyz, cur_viewdirs, app_features, {}
+            )
+
+            cur_sigma = self.compute_densityfeature(cur_xyz)
+            cur_sigma, _, _ = raw2alpha(cur_sigma.view(-1, 1), 0.25)
+
+            cur_sigma = cur_sigma.clamp(0.0, 1.0)
+            cur_sigma = cur_sigma.view(gridSize[0], gridSize[1])
+
+            cur_rgb = cur_rgb.clamp(0.0, 1.0)
+            cur_rgb = cur_rgb.view(gridSize[0], gridSize[1], 3) * cur_sigma.view(gridSize[0], gridSize[1], 1)
+
+            cur_rgb = np.uint8(np.array(cur_rgb.detach().cpu()) * 255.0)
+            cur_rgb = cv2.cvtColor(cur_rgb, cv2.COLOR_BGR2RGB)
+            cur_sigma = np.uint8(np.array(cur_sigma.detach().cpu()) * 255.0)
+
+            print(f'Writing tmp/{i}')
+            cv2.imwrite(f'tmp/rgb_perspective/{i}.png', cur_rgb)
+            cv2.imwrite(f'tmp/density_perspective/{i}.png', cur_sigma)
+
+        exit()
+    
+    def write_point_clouds(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        batch_size = x["viewdirs"].shape[0]
+        nSamples = x["points"].shape[-1] // 3
+        points = x["points"].reshape(batch_size, nSamples, 3)
+        point_offsets = x["point_offset"].reshape(batch_size, nSamples, 3)
+
+        os.makedirs("tmp/points", exist_ok=True)
+
+        # Individual
+        for i in range(nSamples):
+            print(i)
+            cur_points = np.array(points[..., i, :].detach().cpu())
+            cur_point_offsets = np.array(point_offsets[..., i, :].detach().cpu())
+
+            xs, ys, zs = cur_points[..., 0], cur_points[..., 1], cur_points[..., 2]
+
+            cs = np.clip(np.linalg.norm(cur_point_offsets, axis=-1) / 0.05, 0.0, 1.0)
+            cs = np.stack(
+                [
+                    np.ones_like(xs) * cs,
+                    np.ones_like(xs) * cs,
+                    np.ones_like(xs) * cs,
+                ],
+                axis=-1
+            )
+
+            fig = plt.figure(figsize=(20,20))
+            ax = fig.add_subplot(projection='3d')
+            ax.scatter(xs, zs, ys, c=cs)
+            #ax.scatter(xs, zs, ys)
+            ax.set_xlabel('X Label')
+            ax.set_ylabel('Y Label')
+            ax.set_zlabel('Z Label')
+
+            ax.set_xlim([-1.0, 1.0])
+            ax.set_ylim([-1.0, 1.0])
+            ax.set_zlim([-1.0, 1.0])
+
+            plt.show()
+            plt.savefig(f"tmp/points/{i}.png")
+
+            plt.close()
+
+        ## All
+        #fig = plt.figure()
+        #ax = fig.add_subplot(projection='3d')
+
+        #for i in range(nSamples):
+        #    print(i)
+        #    cur_points = np.array(points[..., i, :].detach().cpu())
+        #    print(cur_points.shape)
+
+        #    xs, ys, zs = cur_points[..., 0], cur_points[..., 1], cur_points[..., 2]
+        #    C = np.array([i / nSamples, 0, 0])
+
+        #    ax.scatter(xs, zs, ys, c=C)
+        
+        #ax.set_xlabel('X Label')
+        #ax.set_ylabel('Y Label')
+        #ax.set_zlabel('Z Label')
+
+        #plt.show()
+        #plt.savefig(f"tmp/points/all.png")
+        #plt.close()
+
+        exit()
+
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        #self.write_layers(x, render_kwargs)
+        #self.write_point_clouds(x, render_kwargs)
+        #self.write_layers_perspective(x, render_kwargs)
+
         # Batch size
         batch_size = x["viewdirs"].shape[0]
 
