@@ -7,6 +7,7 @@ from typing import Callable, List, Union, Dict
 
 import numpy as np
 import torch
+from torch import nn
 from torch.autograd import Function
 from torch.cuda.amp import custom_bwd, custom_fwd
 
@@ -112,7 +113,7 @@ class NGPRadianceField(torch.nn.Module):
             n_input_dims=self.grid_encoding.n_output_dims,
             n_output_dims=1 + self.geo_feat_dim,
             network_config={
-                "otype": "FullyFusedMLP",
+                "otype": cfg.otype if "otype" in cfg else "FullyFusedMLP",
                 "activation": "ReLU",
                 "output_activation": "None",
                 "n_neurons": cfg.hidden_dim,
@@ -131,7 +132,7 @@ class NGPRadianceField(torch.nn.Module):
             ),
             n_output_dims=3,
             network_config={
-                "otype": "FullyFusedMLP",
+                "otype": cfg.otype if "otype" in cfg else "FullyFusedMLP",
                 "activation": "ReLU",
                 "output_activation": "Sigmoid",
                 "n_neurons": 64,
@@ -359,6 +360,305 @@ class NGPRadianceField(torch.nn.Module):
         return outputs
 
 
+class NGPNet(torch.nn.Module):
+    """Instance-NGP radiance Field"""
+
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        cfg,
+        **kwargs
+    ) -> None:
+        super().__init__()
+
+        self.cfg = cfg
+
+        # AABB
+        self.register_buffer('aabb', torch.tensor(cfg.aabb))
+
+        # Net params
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.pos_depth = cfg.pos_depth
+        self.pos_width = cfg.pos_width
+        self.pos_feat = cfg.pos_feat
+
+        self.dir_depth = cfg.dir_depth
+        self.dir_width = cfg.dir_width
+
+        # Grid params
+        self.n_levels = cfg.n_levels
+        self.n_features_per_level = cfg.n_features_per_level if 'n_features_per_level' in cfg else 2
+
+        per_level_scale = math.exp(
+            (math.log(cfg.max_res) - math.log(cfg.base_res)) / (cfg.n_levels - 1)
+        )
+
+        # Create grid
+        self.grid_encoding = tcnn.Encoding(
+            n_input_dims=3,
+            encoding_config={
+                "otype": "HashGrid",
+                "n_levels": self.n_levels,
+                "n_features_per_level": self.n_features_per_level,
+                "log2_hashmap_size": cfg.log2_hashmap_size,
+                "base_resolution": cfg.base_res,
+                "per_level_scale": per_level_scale,
+            },
+        )
+
+        # Create networks
+        self.mlp_pos = tcnn.Network(
+            n_input_dims=self.grid_encoding.n_output_dims,
+            n_output_dims=self.out_channels + self.pos_feat,
+            network_config={
+                "otype": cfg.otype if "otype" in cfg else "FullyFusedMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": self.pos_width,
+                "n_hidden_layers": self.pos_depth,
+            },
+        )
+
+        self.mlp_dir = tcnn.Network(
+            n_input_dims=self.pos_feat + (self.in_channels - 3),
+            n_output_dims=self.out_channels,
+            network_config={
+                "otype": cfg.otype if "otype" in cfg else "FullyFusedMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": self.dir_width,
+                "n_hidden_layers": self.dir_depth,
+            },
+        )
+
+        # Windowing
+        self.cur_iter = 0
+        self.window_iters = cfg.window_iters if "window_iters" in cfg else 0.0
+
+        if self.window_iters > 0:
+            self.n_window_levels = cfg.n_window_levels
+            self.window_discrete = cfg.window_discrete
+            self.window_iters_single = self.window_iters // self.n_window_levels
+            self.window_iters_list = np.arange(0, self.window_iters, self.window_iters_single)
+
+        # Optimization groups
+        self.opt_group = {
+            cfg.opt_group_grid if "opt_group_grid" in cfg else "embedding": [
+                self.grid_encoding,
+            ],
+            cfg.opt_group if "opt_group" in cfg else "embedding_impl": [
+                self.mlp_pos,
+                self.mlp_dir
+            ],
+        }
+    
+    def window_features(self, feat):
+        if self.window_iters == 0 or self.n_window_levels == 0 \
+            or self.cur_iter >= self.window_iters_list[-1] + self.window_iters_single:
+            return feat
+
+        feat_split = torch.split(feat, self.n_features_per_level * self.n_levels // self.n_window_levels , dim=-1)
+        new_features = [feat_split[0]]
+
+        for l, cur_feat in enumerate(feat_split[1:]):
+            window_start = self.window_iters_list[l+1]
+            window_end = self.window_iters_list[l+1] + self.window_iters_single
+            window_iters = window_end - window_start
+
+            if self.cur_iter >= window_end:
+                w = 1.0
+            elif self.cur_iter <= window_start:
+                w = 0.0
+            elif self.window_discrete:
+                w = 0.0
+            else:
+                w = min(max(float(self.cur_iter - window_start) / window_iters, 0.0), 1.0)
+            
+            new_features.append(w * cur_feat)
+        
+        return torch.cat(new_features, dim=-1)
+
+    def forward(self, x):
+        input_x = x
+
+        pos, dir_enc = x[..., :3], x[..., 3:]
+        aabb_min, aabb_max = torch.split(self.aabb, 3, dim=-1)
+        pos = (pos - aabb_min) / (aabb_max - aabb_min)
+
+        # Get features
+        feat = self.grid_encoding(pos.view(-1, 3))
+        feat = self.window_features(feat)
+
+        # Run base MLP
+        x = self.mlp_pos(feat).to(input_x)
+        output = x[..., :self.out_channels]
+        pos_feat = x[..., self.out_channels:]
+
+        # Run direction MLP
+        dir_enc = dir_enc.view(x.shape[0], dir_enc.shape[-1])
+
+        x = (
+            self.mlp_dir(torch.cat([pos_feat, dir_enc], dim=-1))
+            .view(list(input_x.shape[:-1]) + [self.out_channels])
+            .to(input_x)
+        )
+
+        #return output + x
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class FastPointNet(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        cfg,
+        **kwargs
+    ) -> None:
+        super().__init__()
+
+        self.cfg = cfg
+        self.register_buffer('aabb', torch.tensor(cfg.aabb))
+
+        # Net params
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.pos_depth = cfg.pos_depth
+        self.pos_width = cfg.pos_width
+        self.pos_feat = cfg.pos_feat
+
+        self.dir_depth = cfg.dir_depth
+        self.dir_width = cfg.dir_width
+
+        # Create networks
+        self.mlp_pos = tcnn.Network(
+            n_input_dims=3,
+            n_output_dims=self.out_channels + self.pos_feat,
+            network_config={
+                "otype": cfg.otype if "otype" in cfg else "CutlassMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": self.pos_width,
+                "n_hidden_layers": self.pos_depth,
+            },
+        )
+
+        self.mlp_dir = tcnn.Network(
+            n_input_dims=self.pos_feat + (self.in_channels - 3),
+            n_output_dims=self.out_channels,
+            network_config={
+                "otype": cfg.otype if "otype" in cfg else "CutlassMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": self.dir_width,
+                "n_hidden_layers": self.dir_depth,
+            },
+        )
+
+        # Optimization groups
+        self.opt_group = {
+            cfg.opt_group if "opt_group" in cfg else "embedding_impl": [
+                self.mlp_pos,
+                self.mlp_dir
+            ],
+        }
+
+    def forward(self, x):
+        input_x = x
+
+        pos, dir_enc = x[..., :3], x[..., 3:]
+        aabb_min, aabb_max = torch.split(self.aabb, 3, dim=-1)
+        pos = (pos - aabb_min) / (aabb_max - aabb_min)
+
+        # Run base MLP
+        x = self.mlp_pos(pos).to(input_x)
+        output = x[..., :self.out_channels]
+        pos_feat = x[..., self.out_channels:]
+
+        # Run direction MLP
+        dir_enc = dir_enc.view(x.shape[0], dir_enc.shape[-1])
+
+        x = (
+            self.mlp_dir(torch.cat([pos_feat, dir_enc], dim=-1))
+            .view(list(input_x.shape[:-1]) + [self.out_channels])
+            .to(input_x)
+        )
+
+        #return output + x
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class FastNet(torch.nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        cfg,
+        **kwargs
+    ) -> None:
+        super().__init__()
+
+        self.cfg = cfg
+
+        # Net params
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+
+        self.depth = cfg.depth
+        self.width = cfg.hidden_channels
+
+        # Create networks
+        self.mlp = tcnn.Network(
+            n_input_dims=self.in_channels,
+            n_output_dims=self.out_channels,
+            network_config={
+                "otype": cfg.otype if "otype" in cfg else "CutlassMLP",
+                "activation": "ReLU",
+                "output_activation": "None",
+                "n_neurons": self.width,
+                "n_hidden_layers": self.depth,
+            },
+        )
+
+        self.include_bias = cfg.include_bias if "include_bias" in cfg else False
+
+        if self.include_bias:
+            self.layer = nn.Linear(1, self.out_channels)
+
+        # Optimization groups
+        self.opt_group = {
+            cfg.opt_group if "opt_group" in cfg else "embedding_impl": [
+                self.mlp,
+            ] + ([self.layer] if self.include_bias else []),
+        }
+
+    def forward(self, x):
+        input_x = x
+
+        x = self.mlp(input_x).to(input_x)
+
+        if self.include_bias:
+            return x + self.layer.bias.unsqueeze(0)
+        else:
+            return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
 ngp_base_dict = {
-    "ngp_static": NGPRadianceField
+    "ngp_rf": NGPRadianceField,
+    "ngp_net": NGPNet,
+    "fast_point_net": FastPointNet,
+    "fast_net": FastNet,
 }

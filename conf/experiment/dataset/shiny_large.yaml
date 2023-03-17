@@ -12,6 +12,7 @@ use_ndc: True
 val_num: 8
 val_skip: 8
 val_all: False
+#val_all: True # NOTE: New
 
 render_params:
   interpolate: False

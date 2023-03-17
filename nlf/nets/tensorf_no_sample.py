@@ -175,8 +175,8 @@ class TensorVMNoSample(TensorVMSplit):
         exit()
 
     def write_layers_perspective(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
-        #gridSize = (512, 512, 32)
-        gridSize = (301, 403, 32)
+        gridSize = (512, 512, 32)
+        #gridSize = (301, 403, 32)
 
         batch_size = x["viewdirs"].shape[0]
         nSamples = x["points"].shape[-1] // 3
@@ -223,66 +223,60 @@ class TensorVMNoSample(TensorVMSplit):
         points = x["points"].reshape(batch_size, nSamples, 3)
         point_offsets = x["point_offset"].reshape(batch_size, nSamples, 3)
 
-        os.makedirs("tmp/points", exist_ok=True)
+        if "point_offset_3d" in x.keys():
+            point_offsets_3d = x["point_offset_3d"].reshape(batch_size, nSamples, 3)
+        else:
+            point_offsets_3d = torch.zeros_like(point_offsets)
+
+        os.makedirs(f"tmp/points", exist_ok=True)
+        os.makedirs(f"tmp/points_no_3d", exist_ok=True)
+        os.makedirs(f"tmp/points_no_offset", exist_ok=True)
+        os.makedirs(f"tmp/points_none", exist_ok=True)
 
         # Individual
-        for i in range(nSamples):
-            print(i)
+        for i in range(22, 23):
             cur_points = np.array(points[..., i, :].detach().cpu())
             cur_point_offsets = np.array(point_offsets[..., i, :].detach().cpu())
+            cur_point_offsets_3d = np.array(point_offsets_3d[..., i, :].detach().cpu())
 
-            xs, ys, zs = cur_points[..., 0], cur_points[..., 1], cur_points[..., 2]
+            points_dict = {
+                "points": cur_points,
+                "points_no_3d": cur_points - (cur_point_offsets_3d),
+                "points_no_offset": cur_points - (cur_point_offsets),
+                "points_none": cur_points - (cur_point_offsets + cur_point_offsets_3d),
+            }
 
-            cs = np.clip(np.linalg.norm(cur_point_offsets, axis=-1) / 0.05, 0.0, 1.0)
-            cs = np.stack(
-                [
-                    np.ones_like(xs) * cs,
-                    np.ones_like(xs) * cs,
-                    np.ones_like(xs) * cs,
-                ],
-                axis=-1
-            )
+            for name in points_dict.keys():
+                cur_points = points_dict[name]
+                xs, ys, zs = cur_points[..., 0], cur_points[..., 1], cur_points[..., 2]
 
-            fig = plt.figure(figsize=(20,20))
-            ax = fig.add_subplot(projection='3d')
-            ax.scatter(xs, zs, ys, c=cs)
-            #ax.scatter(xs, zs, ys)
-            ax.set_xlabel('X Label')
-            ax.set_ylabel('Y Label')
-            ax.set_zlabel('Z Label')
+                cs = np.clip(np.linalg.norm(cur_point_offsets, axis=-1) / 0.05, 0.0, 1.0)
+                cs = np.stack(
+                    [
+                        np.ones_like(xs) * cs,
+                        np.ones_like(xs) * cs,
+                        np.ones_like(xs) * cs,
+                    ],
+                    axis=-1
+                )
 
-            ax.set_xlim([-1.0, 1.0])
-            ax.set_ylim([-1.0, 1.0])
-            ax.set_zlim([-1.0, 1.0])
+                fig = plt.figure(figsize=(16,16))
+                ax = fig.add_subplot(projection='3d')
+                #ax.scatter(xs, zs, ys, c=cs)
+                #ax.scatter(xs, zs, ys)
+                ax.scatter(xs, zs, -ys)
+                ax.set_xlabel('X Label')
+                ax.set_ylabel('Y Label')
+                ax.set_zlabel('Z Label')
 
-            plt.show()
-            plt.savefig(f"tmp/points/{i}.png")
+                ax.set_xlim([-1.0, 1.0])
+                ax.set_ylim([-1.0, 1.0])
+                ax.set_zlim([-1.0, 1.0])
 
-            plt.close()
+                plt.show()
+                plt.savefig(f"tmp/{name}/{render_kwargs['image_idx']:04d}.png")
 
-        ## All
-        #fig = plt.figure()
-        #ax = fig.add_subplot(projection='3d')
-
-        #for i in range(nSamples):
-        #    print(i)
-        #    cur_points = np.array(points[..., i, :].detach().cpu())
-        #    print(cur_points.shape)
-
-        #    xs, ys, zs = cur_points[..., 0], cur_points[..., 1], cur_points[..., 2]
-        #    C = np.array([i / nSamples, 0, 0])
-
-        #    ax.scatter(xs, zs, ys, c=C)
-        
-        #ax.set_xlabel('X Label')
-        #ax.set_ylabel('Y Label')
-        #ax.set_zlabel('Z Label')
-
-        #plt.show()
-        #plt.savefig(f"tmp/points/all.png")
-        #plt.close()
-
-        exit()
+                plt.close()
 
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         #self.write_layers(x, render_kwargs)

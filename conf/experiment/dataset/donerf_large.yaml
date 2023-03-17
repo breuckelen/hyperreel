@@ -15,6 +15,8 @@ val_num: 8
 val_skip: 1
 val_all: False
 
+train_skip: 1
+
 render_params:
   interpolate: False
   supersample: 4

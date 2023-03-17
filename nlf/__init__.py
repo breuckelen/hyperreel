@@ -618,6 +618,14 @@ class INRSystem(LightningModule):
         render_kwargs = {}
 
         for reg in self.regularizers:
+            if "fields" in render_kwargs and "fields" in reg.render_kwargs:
+                render_kwargs["fields"] += reg.render_kwargs["fields"]
+                del reg.render_kwargs["fields"]
+
+            if "no_over_fields" in render_kwargs and "no_over_fields" in reg.render_kwargs:
+                render_kwargs["no_over_fields"] += reg.render_kwargs
+                del reg.render_kwargs["no_over_fields"]
+
             render_kwargs.update(reg.render_kwargs)
 
         return render_kwargs
@@ -627,6 +635,14 @@ class INRSystem(LightningModule):
         render_kwargs = {}
 
         for vis in self.visualizers:
+            if "fields" in render_kwargs and "fields" in vis.render_kwargs:
+                render_kwargs["fields"] += vis.render_kwargs["fields"]
+                del vis.render_kwargs["fields"]
+
+            if "no_over_fields" in render_kwargs and "no_over_fields" in vis.render_kwargs:
+                render_kwargs["no_over_fields"] += vis.render_kwargs
+                del vis.render_kwargs["no_over_fields"]
+
             render_kwargs.update(vis.render_kwargs)
 
         return render_kwargs
@@ -844,7 +860,7 @@ class INRSystem(LightningModule):
             #cur_results = self.render_fn.model.embedding_model(cur_batch['coords'], {})
             #cur_results = self.render_fn.model.embedding_model.embeddings[0]({'rays': cur_batch['coords']}, {})
 
-            cur_results = self(cur_batch['coords'], rendering=True, **visualizer_render_kwargs)
+            cur_results = self(cur_batch['coords'], image_idx=idx, rendering=True, **visualizer_render_kwargs)
             #cur_results = self.model_script(cur_batch['coords'])
 
             torch.cuda.synchronize()
@@ -930,7 +946,10 @@ class INRSystem(LightningModule):
         def _add_outputs(outputs):
             for key in outputs:
                 if key not in all_images:
-                    all_images[key] = np.clip(np.array(outputs[key]), 0.0, 1.0)
+                    if "data" not in key:
+                        all_images[key] = np.clip(np.array(outputs[key]), 0.0, 1.0)
+                    else:
+                        all_images[key] = np.array(outputs[key])
 
         # Visualizer images
         for vis in self.visualizers:

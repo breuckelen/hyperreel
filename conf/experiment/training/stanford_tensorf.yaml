@@ -111,3 +111,88 @@ optimizers:
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+
+  embedding_impl_small:
+    optimizer: adam
+    lr: 0.00035
+    clip: False
+    clip_amount: 1.0
+    momentum: 0.9
+    weight_decay: 0
+
+    lr_scheduler: exp
+    warmup_multiplier: 1.0
+    warmup_epochs: 0
+
+    decay_epoch: 100
+    decay_gamma: 0.125
+
+    reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+
+  embedding_impl_med:
+    optimizer: adam
+    lr: 0.0005
+    clip: False
+    clip_amount: 1.0
+    momentum: 0.9
+    weight_decay: 0
+
+    lr_scheduler: exp
+    warmup_multiplier: 1.0
+    warmup_epochs: 0
+
+    decay_epoch: 100
+    decay_gamma: 0.125
+
+    reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+
+  embedding_impl_large:
+    optimizer: adam
+    lr: 0.00075
+    clip: False
+    clip_amount: 1.0
+    momentum: 0.9
+    weight_decay: 0
+
+    lr_scheduler: exp
+    warmup_multiplier: 1.0
+    warmup_epochs: 0
+
+    decay_epoch: 100
+    decay_gamma: 0.125
+
+    reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+
+  ngp_impl:
+    optimizer: adam
+    lr: 0.001
+    clip: False
+    clip_amount: 1.0
+    momentum: 0.9
+    weight_decay: 0
+
+    lr_scheduler: exp
+    warmup_multiplier: 1.0
+    warmup_epochs: 0
+
+    decay_epoch: 100
+    decay_gamma: 0.125
+
+    reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+
+  ngp_grid:
+    optimizer: adam
+    lr: 0.001
+    clip: False
+    clip_amount: 1.0
+    momentum: 0.9
+    weight_decay: 0
+
+    lr_scheduler: exp
+    warmup_multiplier: 1.0
+    warmup_epochs: 0
+
+    decay_epoch: 100
+    decay_gamma: 0.125
+
+    reset_opt_list: [4000, 6000, 8000, 10000, 12000]

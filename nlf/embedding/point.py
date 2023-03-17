@@ -97,18 +97,11 @@ class PointPredictionEmbedding(nn.Module):
             # Update in channels
             self.in_channels += pe.out_channels
 
-        #self.total_in_channels = self.in_channels * self.in_z_channels
-        self.total_in_channels = self.in_channels
-
         # Outputs
         self.out_z_channels = cfg.out_z_channels if 'out_z_channels' in cfg else 1
         self.outputs = cfg.outputs
         self.output_names = list(self.outputs.keys())
         self.output_shapes = [self.outputs[k].channels for k in self.outputs.keys()]
-        self.output_residual = [
-            self.outputs[k].residual if 'residual' in self.outputs[k] else False \
-            for k in self.outputs.keys()
-        ]
         self.out_channels = sum(self.output_shapes)
         self.total_out_channels = self.out_channels * self.out_z_channels
         self.out_z_per_in_z = self.out_z_channels // self.in_z_channels
@@ -119,9 +112,7 @@ class PointPredictionEmbedding(nn.Module):
             cfg.net['linear_last'] = False
 
         self.net = net_dict[cfg.net.type](
-            self.total_in_channels,
-            #self.in_channels,
-            #self.total_out_channels,
+            self.in_channels,
             self.out_channels * self.out_z_per_in_z,
             cfg.net,
             group=self.group
@@ -146,7 +137,9 @@ class PointPredictionEmbedding(nn.Module):
         inputs = []
 
         for inp_idx, inp_name in enumerate(self.input_names):
-            if inp_name == 'viewdirs':
+            if inp_name in x:
+                inputs.append(x[inp_name][..., :self.input_shapes[inp_idx]])
+            elif inp_name == 'viewdirs':
                 inputs.append(rays[..., None, 3:6].repeat(1, points.shape[1], 1))
             elif inp_name == 'origins':
                 inputs.append(rays[..., None, 0:3].repeat(1, points.shape[1], 1))
@@ -167,8 +160,9 @@ class PointPredictionEmbedding(nn.Module):
                     self.params[idx](cur_input)
                 )
             )
+            param_inputs[-1] = param_inputs[-1].view(-1, param_inputs[-1].shape[-1])
 
-        inputs = torch.cat(param_inputs, -1).view(-1, self.total_in_channels)
+        inputs = torch.cat(param_inputs, -1).view(-1, self.in_channels)
 
         if self.filter:
             # Run on valid
@@ -186,21 +180,6 @@ class PointPredictionEmbedding(nn.Module):
 
         for i in range(len(self.output_shapes)):
             cur_output = self.activations[i](outputs_flat[i])
-
-            if self.output_residual[i]:
-                last_output = x[self.output_names[i]].view(
-                    cur_output.shape[0], -1, 1, cur_output.shape[-1]
-                )
-                cur_output_shape = cur_output.shape
-                cur_output = cur_output.view(
-                    cur_output.shape[0],
-                    last_output.shape[1],
-                    -1,
-                    cur_output.shape[-1]
-                ) + last_output
-                #) + torch.mean(last_output, dim=-2, keepdim=True)
-                cur_output = cur_output.view(*cur_output_shape)
-
             x[self.output_names[i]] = cur_output
 
         return x
@@ -242,6 +221,59 @@ class ExtractFieldsEmbedding(nn.Module):
                 outputs[field] = x[field]
 
         return outputs
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class AddFieldsEmbedding(nn.Module):
+    fields: List[str]
+
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.fields = list(cfg.fields.keys())
+        self.field_channels = []
+
+        for field_key in self.fields:
+            field_cfg = cfg.fields[field_key]
+
+            self.field_channels.append(
+                (field_cfg.start, field_cfg.end)
+            )
+        
+        self.out_field = cfg.out_field
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        out = 0.0
+        broadcast_size = None
+
+        for i, field_key in enumerate(self.fields):
+            start_channel, end_channel = self.field_channels[i]
+            cur_field = x[field_key]
+
+            if broadcast_size is None:
+                broadcast_size = cur_field.shape[1]
+
+            if len(cur_field.shape) == 2:
+                out = out + cur_field[..., start_channel:end_channel].reshape(
+                    cur_field.shape[0], 1, 1, (end_channel - start_channel)
+                )
+            else:
+                out = out + x[field_key][..., start_channel:end_channel].reshape(
+                    cur_field.shape[0], cur_field.shape[1] // broadcast_size, -1, (end_channel - start_channel)
+                )
+        
+        x[self.out_field] = out.reshape(out.shape[0], -1, out.shape[-1])
+        return x
 
     def set_iter(self, i):
         self.cur_iter = i
@@ -351,17 +383,14 @@ class PointOffsetEmbedding(nn.Module):
         self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
 
         self.in_offset_field = cfg.in_offset_field if 'in_offset_field' in cfg else 'point_offset'
-        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else 'point_offset'
+        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else self.in_offset_field
 
         self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
-        self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else 'points'
+        self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else self.in_points_field
         self.save_points_field = cfg.save_points_field if 'save_points_field' in cfg else None
 
         # Point offset
         self.use_sigma = cfg.use_sigma if 'use_sigma' in cfg else True
-        self.activation = get_activation(
-            cfg.activation if 'activation' in cfg else 'identity'
-        )
 
         # Dropout params
         self.use_dropout = 'dropout' in cfg
@@ -380,7 +409,8 @@ class PointOffsetEmbedding(nn.Module):
         else:
             sigma = torch.zeros(in_points.shape[0], in_points.shape[1], 1, device=in_points.device)
 
-        point_offset = self.activation(x[self.in_offset_field]) * (1 - sigma)
+        point_offset = x[self.in_offset_field] * (1 - sigma)
+        #print(self.in_offset_field, point_offset.max(), (1 - sigma).max())
 
         # Dropout
         if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) and self.cur_iter < self.dropout_stop_iter and self.training:
@@ -392,6 +422,85 @@ class PointOffsetEmbedding(nn.Module):
 
         if self.out_offset_field is not None:
             x[self.out_offset_field] = point_offset
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class DampFieldEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # In & out fields
+        self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
+        self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
+        self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else 'points'
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        sigma = x[self.in_density_field]
+        x[self.out_points_field] = x[self.in_points_field] * (1.0 - sigma)
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class EpipolarOffsetEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # In & out fields
+        self.in_offset_field = cfg.in_offset_field if 'in_offset_field' in cfg else 'point_offset'
+        self.in_direction_field = cfg.in_direction_field if 'in_direction_field' in cfg else 'viewdirs'
+        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else self.in_offset_field
+
+        if "window" in cfg:
+            self.window_start_iters = cfg.window.wait_iters
+            self.window_iters = cfg.window.window_iters
+        else:
+            self.window_start_iters = 0
+            self.window_iters = 0
+
+    def window(self):
+        cur_iter = self.cur_iter - self.window_start_iters
+
+        if cur_iter < 0:
+            return 0.0
+        elif cur_iter >= self.window_iters:
+            return 1.0
+        else:
+            w = min(max(float(cur_iter) / self.window_iters, 0.0), 1.0)
+            return w
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        offset = x[self.in_offset_field]
+        viewdirs = nn.functional.normalize(x['rays'][..., None, 3:6], dim=-1)
+
+        epipolar_offset = offset - dot(
+            offset, viewdirs, keepdim=True
+        ) * viewdirs
+
+        w = self.window()
+        x[self.out_offset_field] = (1 - w) * offset + w * epipolar_offset
 
         return x
 
@@ -854,16 +963,19 @@ class AddPointOutputsEmbedding(nn.Module):
         # Extra outputs
         self.extra_outputs = list(cfg.extra_outputs)
 
+        # Overrides
+        self.override = cfg.override if 'override' in cfg else False
+
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         rays = x[self.rays_name]
 
-        if 'times' in self.extra_outputs and 'times' not in x:
+        if 'times' in self.extra_outputs and ('times' not in x or self.override):
             x['times'] = rays[..., None, 7:8].repeat(1, x['points'].shape[1], 1)
 
-        if 'base_times' in self.extra_outputs and 'base_times' not in x:
+        if 'base_times' in self.extra_outputs and ('base_times' not in x or self.override):
             x['base_times'] = rays[..., None, 7:8].repeat(1, x['points'].shape[1], 1)
 
-        if 'viewdirs' in self.extra_outputs and 'viewdirs' not in x:
+        if 'viewdirs' in self.extra_outputs and ('viewdirs' not in x or self.override):
             x['viewdirs'] = rays[..., None, 3:6].repeat(1, x['points'].shape[1], 1)
 
         return x
@@ -916,9 +1028,12 @@ class ConvertDistanceEmbedding(nn.Module):
 point_embedding_dict = {
     'point_prediction': PointPredictionEmbedding,
     'extract_fields': ExtractFieldsEmbedding,
+    'add_fields': AddFieldsEmbedding,
     'create_points': CreatePointsEmbedding,
     'point_density': PointDensityEmbedding,
     'point_offset': PointOffsetEmbedding,
+    'damp_field': DampFieldEmbedding,
+    'epipolar_offset': EpipolarOffsetEmbedding,
     'generate_samples': GenerateNumSamplesEmbedding,
     'select_points': SelectPointsEmbedding,
     'random_offset': RandomOffsetEmbedding,

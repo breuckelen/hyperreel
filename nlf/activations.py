@@ -28,6 +28,9 @@ class LeakyReLU(nn.Module):
     def forward(self, x):
         return self.act(x)
 
+    def set_iter(self, i):
+        pass
+
 
 class ReLU(nn.Module):
     def __init__(self, cfg, **kwargs):
@@ -41,6 +44,9 @@ class ReLU(nn.Module):
     def forward(self, x):
         return self.act(x)
 
+    def set_iter(self, i):
+        pass
+
 
 class Abs(nn.Module):
     def __init__(self, cfg):
@@ -48,6 +54,9 @@ class Abs(nn.Module):
 
     def forward(self, x):
         return torch.abs(x)
+
+    def set_iter(self, i):
+        pass
 
 
 class Sigmoid(nn.Module):
@@ -64,6 +73,32 @@ class Sigmoid(nn.Module):
 
     def forward(self, x):
         return self.act(x * self.inner_fac + self.shift) * self.outer_fac
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class DoubleSigmoid(nn.Module):
+    def __init__(self, cfg, **kwargs):
+        super().__init__()
+
+        self.act = nn.Sigmoid(**kwargs)
+        self.inner_fac = cfg["inner_fac"] if "inner_fac" in cfg else 1.0
+        self.outer_fac = cfg["outer_fac"] if "outer_fac" in cfg else 1.0
+        self.shift = cfg.shift if "shift" in cfg else 0.0
+
+        if "fac" in cfg:
+            self.outer_fac = cfg["fac"]
+
+    def forward(self, x):
+        bias = self.act(torch.zeros_like(x) * self.inner_fac - self.shift) * self.outer_fac
+        y = (self.act(torch.abs(x) * self.inner_fac - self.shift) * self.outer_fac - bias) * 2.0
+
+        return torch.where(
+            x < 0,
+            -y,
+            y 
+        )
 
     def set_iter(self, i):
         self.cur_iter = i
@@ -96,6 +131,9 @@ class Softmax(nn.Module):
     def forward(self, x):
         return self.act(x)
 
+    def set_iter(self, i):
+        pass
+
 
 class SparseMagnitude(nn.Module):
     def __init__(self, cfg, **kwargs):
@@ -117,6 +155,9 @@ class SparseMagnitude(nn.Module):
         x = torch.nn.functional.normalize(x, dim=-1) * mag[..., None]
         return x
 
+    def set_iter(self, i):
+        pass
+
 
 class Tanh(nn.Module):
     def __init__(self, cfg, **kwargs):
@@ -135,6 +176,9 @@ class Tanh(nn.Module):
 
     def inverse(self, x):
         return (torch.atanh(x / self.outer_fac) - self.shift) / self.inner_fac
+
+    def set_iter(self, i):
+        pass
 
 
 class IdentityTanh(nn.Module):
@@ -159,6 +203,9 @@ class IdentityTanh(nn.Module):
 
         return torch.where(torch.abs(x) < 1.91501, x, torch.atanh(x / 2.0)) / 2.0
 
+    def set_iter(self, i):
+        pass
+
 
 class Identity(nn.Module):
     def __init__(self, cfg, **kwargs):
@@ -177,6 +224,9 @@ class Identity(nn.Module):
     def inverse(self, x):
         return (x / self.outer_fac - self.shift) / self.inner_fac
 
+    def set_iter(self, i):
+        pass
+
 
 class Power(nn.Module):
     def __init__(self, cfg, **kwargs):
@@ -190,13 +240,21 @@ class Power(nn.Module):
     def inverse(self, x):
         return torch.pow(torch.abs(x) + 1e-8, 1.0 / self.power) * torch.sign(x)
 
+    def set_iter(self, i):
+        pass
+
 
 class L1Norm(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
+        self.fac = cfg.fac if "fac" in cfg else 1.0
+
     def forward(self, x):
-        return torch.nn.functional.normalize(x, p=1, dim=-1) * x.shape[-1]
+        return torch.nn.functional.normalize(x, p=1, dim=-1) * self.fac
+
+    def set_iter(self, i):
+        pass
 
 
 class Probs(nn.Module):
@@ -205,6 +263,9 @@ class Probs(nn.Module):
 
     def forward(self, x):
         return torch.nn.functional.normalize(torch.abs(x), p=1, dim=-1)
+
+    def set_iter(self, i):
+        pass
 
 
 class RowL2Norm(nn.Module):
@@ -230,6 +291,9 @@ class RowL2Norm(nn.Module):
             x = torch.nn.functional.normalize(x, p=2.0, dim=-1)
 
         return x.view(batch_size, total_channels) * self.fac
+
+    def set_iter(self, i):
+        pass
 
 
 class RowL2NormZOnly(nn.Module):
@@ -261,6 +325,9 @@ class RowL2NormZOnly(nn.Module):
 
         return x.view(batch_size, total_channels) * self.fac
 
+    def set_iter(self, i):
+        pass
+
 
 class RowLInfNorm(nn.Module):
     def __init__(self, cfg):
@@ -285,6 +352,9 @@ class RowLInfNorm(nn.Module):
             x = torch.nn.functional.normalize(x, p=float("inf"), dim=-1)
 
         return x.view(batch_size, total_channels) * self.fac
+
+    def set_iter(self, i):
+        pass
 
 
 class RowL1Norm(nn.Module):
@@ -311,22 +381,23 @@ class RowL1Norm(nn.Module):
 
         return x.view(batch_size, total_channels) * self.fac
 
+    def set_iter(self, i):
+        pass
+
 
 class L2Norm(nn.Module):
     def __init__(self, cfg):
         super().__init__()
 
-        if "param_channels" in cfg and cfg.param_channels is not None:
-            self.fac = 1.0 / np.sqrt(cfg.param_channels)
-        else:
-            self.fac = 1.0
+        self.fac = cfg.fac if "fac" in cfg else 1.0
 
     def forward(self, x):
         return (
-            torch.nn.functional.normalize(x, p=2.0, dim=-1)
-            * np.sqrt(x.shape[-1])
-            * self.fac
+            torch.nn.functional.normalize(x, p=2.0, dim=-1) * self.fac
         )
+
+    def set_iter(self, i):
+        pass
 
 
 class Zero(nn.Module):
@@ -335,6 +406,9 @@ class Zero(nn.Module):
 
     def forward(self, x):
         return torch.zeros_like(x)
+
+    def set_iter(self, i):
+        pass
 
 
 class RGBA(nn.Module):
@@ -366,6 +440,9 @@ class Alpha(nn.Module):
     def forward(self, x):
         return 1.0 - torch.exp(-torch.relu(x))
 
+    def set_iter(self, i):
+        pass
+
 
 class Gaussian(nn.Module):
     def __init__(self, cfg):
@@ -378,6 +455,9 @@ class Gaussian(nn.Module):
 
     def forward(self, x):
         return torch.exp(-0.5 * torch.square(x / self.sigma))
+
+    def set_iter(self, i):
+        pass
 
 
 def se3_hat(twist):
@@ -421,6 +501,9 @@ class TwistToMatrix(nn.Module):
 
         return se3_hat(twist).view(twist.shape[0], -1)
 
+    def set_iter(self, i):
+        pass
+
 
 class AxisAngle(nn.Module):
     def __init__(self, cfg):
@@ -435,6 +518,9 @@ class AxisAngle(nn.Module):
         axis_angle = twist[..., 0:3] * self.fac
         rot_mat = axis_angle_to_matrix(axis_angle)
         return rot_mat
+
+    def set_iter(self, i):
+        pass
 
 
 class AxisAngleTranslation(nn.Module):
@@ -458,8 +544,11 @@ class AxisAngleTranslation(nn.Module):
 
         return torch.cat([rot_mat, trans.unsqueeze(-1)], dim=-1)
 
+    def set_iter(self, i):
+        pass
 
-class EaseValue(nn.Module):
+
+class EaseInValue(nn.Module):
     def __init__(self, cfg, **kwargs):
         super().__init__()
 
@@ -479,7 +568,7 @@ class EaseValue(nn.Module):
             w = min(max(float(self.cur_iter) / self.window_iters, 0.0), 1.0)
             return w
 
-    def ease_out(self, out):
+    def ease(self, out):
         if self.cur_iter >= self.window_iters:
             return out
         elif self.window_iters == 0:
@@ -490,10 +579,49 @@ class EaseValue(nn.Module):
 
     def forward(self, x):
         out = self.act(x)
-        return self.ease_out(out)
+        return self.ease(out)
 
     def set_iter(self, i):
         self.cur_iter = i - self.wait_iters
+        self.act.set_iter(i)
+
+
+class EaseOutValue(nn.Module):
+    def __init__(self, cfg, **kwargs):
+        super().__init__()
+
+        self.act = get_activation(cfg.activation, **kwargs)
+
+        self.end_value = cfg.end_value if "end_value" in cfg else 0.0
+        self.wait_iters = cfg.wait_iters if "wait_iters" in cfg else 0.0
+        self.window_iters = cfg.window_iters if "window_iters" in cfg else 0.0
+        self.cur_iter = 0
+
+    def weight(self):
+        if self.cur_iter >= self.window_iters:
+            return 1.0
+        elif self.window_iters == 0:
+            return 0.0
+        else:
+            w = min(max(float(self.cur_iter) / self.window_iters, 0.0), 1.0)
+            return w
+
+    def ease(self, out):
+        if self.cur_iter >= self.window_iters:
+            return torch.ones_like(out) * self.end_value
+        elif self.window_iters == 0:
+            return out
+        else:
+            w = min(max(float(self.cur_iter) / self.window_iters, 0.0), 1.0)
+            return w * self.end_value + (1 - w) * out
+
+    def forward(self, x):
+        out = self.act(x)
+        return self.ease(out)
+
+    def set_iter(self, i):
+        self.cur_iter = i - self.wait_iters
+        self.act.set_iter(i)
 
 
 class InterpValue(nn.Module):
@@ -537,6 +665,7 @@ activation_map = {
     "alpha": Alpha,
     "rgba": RGBA,
     "sigmoid": Sigmoid,
+    "double_sigmoid": DoubleSigmoid,
     "softplus": Softplus,
     "softmax": Softmax,
     "sparse_magnitude": SparseMagnitude,
@@ -558,7 +687,8 @@ activation_map = {
     "abs": Abs,
     "twist_to_matrix": TwistToMatrix,
     "axis_angle_translation": AxisAngleTranslation,
-    "ease_value": EaseValue,
+    "ease_in_value": EaseInValue,
+    "ease_out_value": EaseOutValue,
     "interp_value": InterpValue,
 }
 

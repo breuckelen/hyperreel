@@ -1,0 +1,15 @@
+# @package _group_
+
+type: offset_feedback
+ray_chunk: 32768
+batch_size: 8192
+wait_epochs: 5
+
+weight:
+  type: exponential_decay
+  start: 0.25
+  decay: 0.1
+  num_epochs: 50
+
+
+

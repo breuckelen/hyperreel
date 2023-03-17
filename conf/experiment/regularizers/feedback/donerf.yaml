@@ -11,8 +11,8 @@ num_points: -1
 
 weight:
   type: exponential_decay
-  start: 0.1
-  decay: 0.25
+  start: 0.25
+  decay: 0.1
   num_epochs: 50
 
 

@@ -59,7 +59,7 @@ embedding:
           channels: 1
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 1.0
             window_epochs: 0
             wait_epochs: 0
@@ -72,7 +72,7 @@ embedding:
           channels: 1
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 1.0
             window_epochs: 0
             wait_epochs: 0
@@ -92,7 +92,7 @@ embedding:
           channels: 3
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 0.0
             window_epochs: 0
             wait_epochs: 0
@@ -107,7 +107,7 @@ embedding:
           channels: 3
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 0.0
             window_epochs: 0
             wait_epochs: 0

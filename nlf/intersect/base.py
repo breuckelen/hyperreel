@@ -166,15 +166,20 @@ class Intersect(nn.Module):
 
         # Add samples and contract
         z_vals = self.process_z_vals(z_vals)
+        #print(z_vals.view(z_vals.shape[0], -1, 4)[0])
 
         # Residual distances
-        if self.residual_z and 'last_z' in x:
-            last_z = x['last_z']
-            last_z = last_z.view(last_z.shape[0], -1, 1)
-            z_vals = z_vals.view(z_vals.shape[0], last_z.shape[1], -1)
-            z_vals = (z_vals + last_z).view(z_vals.shape[0], -1)
-        else:
-            x['last_z'] = z_vals
+        if self.residual_z:
+            if 'last_z' in x:
+                last_z = x['last_z']
+            elif 'last_distance' in x:
+                last_distance = x['last_distance']
+                #print(last_distance[0])
+                last_z = self.distance_to_z(rays, last_distance)
+                #print(last_z[0])
+            
+            z_vals = z_vals.view(z_vals.shape[0], -1, last_z.shape[-1]) + last_z
+            z_vals = z_vals.view(z_vals.shape[0], -1)
 
         # Get distances
         dists = self.intersect(rays, z_vals)
@@ -212,15 +217,6 @@ class Intersect(nn.Module):
         # Mask again
         dists = dists.unsqueeze(-1)
         mask = (dists == 0.0)
-
-        # Residual distances
-        if self.residual_distance and 'last_distance' in x:
-            last_dists = x['last_distance']
-            last_dists = last_dists.view(last_dists.shape[0], -1, 1, 1)
-            dists = dists.view(dists.shape[0], last_dists.shape[1], -1, 1)
-            dists = (dists + last_dists).view(dists.shape[0], -1, 1)
-        else:
-            x['last_distance'] = dists
 
         # Get points
         points = rays[..., None, :3] + rays[..., None, 3:6] * dists
@@ -260,6 +256,9 @@ class Intersect(nn.Module):
         x['z_vals'] = z_vals
 
         return x
+    
+    def distance_to_z(self, rays, distance):
+        pass
 
     def intersect(self, rays, z_vals):
         pass

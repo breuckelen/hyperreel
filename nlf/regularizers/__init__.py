@@ -6,7 +6,7 @@
 
 from .coarse import CoarseRegularizer
 from .fourier import FourierRegularizer
-from .geometry import FlowRegularizer, GeometryRegularizer, GeometryFeedbackRegularizer, RenderWeightRegularizer
+from .geometry import FlowRegularizer, GeometryRegularizer, GeometryFeedbackRegularizer, OffsetFeedbackRegularizer, RenderWeightRegularizer
 
 from .point import PointRegularizer
 from .ray_density import RayDensityRegularizer, SimpleRayDensityRegularizer
@@ -28,6 +28,7 @@ regularizer_dict = {
     "point": PointRegularizer,
     "geometry": GeometryRegularizer,
     "geometry_feedback": GeometryFeedbackRegularizer,
+    "offset_feedback": OffsetFeedbackRegularizer,
     "flow": FlowRegularizer,
     "render_weight": RenderWeightRegularizer,
     "tensor_tv": TensorTV,

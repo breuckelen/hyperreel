@@ -58,7 +58,7 @@ embedding:
           channels: 1
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 1.0
             window_epochs: 3
             wait_epochs: 0
@@ -71,10 +71,10 @@ embedding:
           channels: 1
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 1.0
             window_epochs: 3
-            wait_epochs: 1
+            wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -91,7 +91,7 @@ embedding:
           channels: 3
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 0.0
             window_epochs: 0
             wait_epochs: 0
@@ -106,7 +106,7 @@ embedding:
           channels: 3
 
           activation:
-            type: ease_value
+            type: ease_in_value
             start_value: 0.0
             window_epochs: 0
             wait_epochs: 0
@@ -127,9 +127,7 @@ embedding:
         type: sphere
 
         sort: True
-        outward_facing: False
-        use_disparity: False
-        max_axis: False
+        sort_outputs: [sigma, point_sigma, point_offset, color_scale, color_shift]
 
         use_sigma: True
 
@@ -148,8 +146,11 @@ embedding:
           type: identity
           fac: 0.5
 
+        z_scale: 0.125
+
     point_offset_0:
       type: point_offset
+      #in_density_field: sigma
       use_sigma: True
 
     add_point_outputs_0:
@@ -181,7 +182,8 @@ color:
     aabb: [[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]]
 
     # Grid size and upsampling
-    N_voxel_init: 3375000
+    #N_voxel_init: 3375000
+    N_voxel_init: 512000
     N_voxel_final: 216000000
 
     upsamp_list: [4000,6000,8000,10000,12000]
