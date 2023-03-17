@@ -160,10 +160,12 @@ def run(cfg: DictConfig, log_dir: str, ckpt_dir: str, workflow_id: str) -> None:
     if cfg.params.render_only:
         cfg.training.render_every = 1
         cfg.training.val_every = 1
+        cfg.training.ckpt_every = 1000000
 
     if cfg.params.test_only:
         cfg.training.test_every = 1
         cfg.training.val_every = 1
+        cfg.training.ckpt_every = 1000000
 
     trainer = INRTrainer(
         cfg,
