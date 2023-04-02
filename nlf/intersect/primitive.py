@@ -144,7 +144,10 @@ class IntersectEuclideanDistanceUnified(Intersect):
             self.end = self.contract_fn.contract_distance(self.end)
 
         self.samples = torch.linspace(
-            self.initial, self.end, z_channels, device="cuda"
+            self.initial,
+            self.end,
+            z_channels,
+            device="cuda"
         ).view(-1, 1)
 
         # Calculate z scale
@@ -199,7 +202,7 @@ class IntersectCylinderOld(Intersect):
 
         # Origin scale
         self.origin_scale_factor = cfg.origin_scale_factor if 'origin_scale_factor' in cfg else 0.0
-        self.origin_initial = torch.tensor(cfg.origin_initial if 'origin_initial' in cfg else [1.0, 1.0, 1.0]).cuda()
+        self.origin_initial = torch.tensor(cfg.origin_initial if 'origin_initial' in cfg else [0.0, 0.0, 0.0]).cuda()
 
         # Flip axes
         self.flip_axes = cfg.flip_axes if 'flip_axes' in cfg else False
@@ -241,8 +244,8 @@ class IntersectCylinderOld(Intersect):
 
         rays = torch.cat(
             [
-                rays[..., None, 0:3] * origins,
-                rays[..., None, 3:6] * origins,
+                rays[..., None, 0:3] * torch.ones_like(origins),
+                rays[..., None, 3:6] * torch.ones_like(origins),
             ],
             -1
         )
@@ -250,7 +253,7 @@ class IntersectCylinderOld(Intersect):
         # Calculate intersection
         return intersect_cylinder(
             rays,
-            torch.zeros_like(origins),
+            origins,
             radii,
         )
 
@@ -369,6 +372,10 @@ class IntersectSphereOld(Intersect):
     def __init__(self, z_channels, cfg, **kwargs):
         super().__init__(z_channels, cfg, **kwargs)
 
+        self.round_centers = cfg.round_centers if 'round_centers' in cfg else False
+        self.round_size = cfg.round_size if 'round_size' in cfg else 1.0
+        self.reparam_origins = cfg.reparam_origins if 'reparam_origins' in cfg else True
+
         # Intersect hyper-params
         if self.use_dataset_bounds:
             self.initial = torch.tensor(cfg.initial if 'initial' in cfg else kwargs['system'].dm.train_dataset.near * 1.5)
@@ -377,6 +384,8 @@ class IntersectSphereOld(Intersect):
             self.initial = torch.tensor(cfg.initial if 'initial' in cfg else 0.0)
             self.end = torch.tensor(cfg.end if 'end' in cfg else 1.0)
 
+        self.num_repeat = cfg.num_repeat if 'num_repeat' in cfg else 1
+
         # Contract
         if self.contract_fn.contract_samples:
             self.initial = self.contract_fn.contract_distance(self.initial)
@@ -384,14 +393,21 @@ class IntersectSphereOld(Intersect):
 
         # Origin scale
         self.origin_scale_factor = cfg.origin_scale_factor if 'origin_scale_factor' in cfg else 0.0
-        self.origin_initial = torch.tensor(cfg.origin_initial if 'origin_initial' in cfg else [1.0, 1.0, 1.0]).cuda()
+        self.origin_initial = torch.tensor(cfg.origin_initial if 'origin_initial' in cfg else [0.0, 0.0, 0.0]).cuda()
 
         # Flip axes
         self.flip_axes = cfg.flip_axes if 'flip_axes' in cfg else False
 
         # Calculate samples
         self.samples = torch.linspace(
-            self.initial, self.end, z_channels, device="cuda"
+            self.initial,
+            self.end,
+            z_channels // self.num_repeat,
+            device='cuda'
+        )
+
+        self.samples = self.samples.repeat(
+            self.num_repeat
         ).view(-1, 1)
 
         # Calculate z scale
@@ -419,6 +435,29 @@ class IntersectSphereOld(Intersect):
         radii = super().process_z_vals(z_vals[..., -1])
         return torch.cat([origins, radii[..., None]], -1).view(z_vals.shape[0], -1)
 
+    def distance_to_z(self, rays, distance):
+        rays_o, rays_d = rays[..., None, :3], rays[..., None, 3:6]
+
+        if self.reparam_origins:
+            origins = rays_o + distance * rays_d
+
+            if self.round_centers:
+                rounded_origins = torch.round(
+                    origins / self.round_size
+                ) * self.round_size
+
+                # Allow gradients to pass through discrete operation
+                origin_offset = rounded_origins - origins
+                origins = origins + origin_offset.detach()
+
+            radii = torch.zeros_like(origins[..., :1])
+        else:
+            origins = rays_o * torch.ones_like(distance)
+            radii = distance
+
+        return torch.cat([origins, radii], dim=-1)
+
+
     def intersect(self, rays, z_vals):
         z_vals = z_vals.view(z_vals.shape[0], self.z_channels, 4)
         origins = z_vals[..., :3]
@@ -426,18 +465,24 @@ class IntersectSphereOld(Intersect):
 
         rays = torch.cat(
             [
-                rays[..., None, 0:3] * origins,
-                rays[..., None, 3:6] * origins,
+                rays[..., None, 0:3] * torch.ones_like(origins),
+                rays[..., None, 3:6] * torch.ones_like(origins),
             ],
             -1
         )
 
         # Calculate intersection
-        return intersect_sphere(
+        dists = intersect_sphere(
             rays,
-            torch.zeros_like(origins),
+            origins,
             radii,
         )
+
+        #print(radii[0])
+        #print(dists[0] - radii[0])
+        #exit()
+
+        return dists
 
 
 class IntersectSphereNew(Intersect):

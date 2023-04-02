@@ -147,7 +147,7 @@ class MIPNeRFContract(BaseContract):
 
         # Inverse distance
         distance = self.distance_activation(distance / 2.0) * 2.0
-        distance = distance.clamp(-2.0, 2.0)
+        distance = distance.clamp(-2.0 + 1e-5, 2.0 - 1e-5)
         t = (2.0 - torch.abs(distance))
         inverse_distance = t / scale_factor + inverse_contract_end_distance
 
@@ -170,7 +170,7 @@ class MIPNeRFContract(BaseContract):
         distance = torch.where(
             torch.abs(distance) < 1.0,
             distance / 1.0,
-            torch.sign(distance) * ( 2.0 - t ),
+            torch.sign(distance) * ( 2.0 - t ).clamp(-2.0 + 1e-5, 2.0 - 1e-5),
         )
 
         return self.distance_activation.inverse(distance / 2.0) * 2.0
@@ -188,7 +188,7 @@ class MIPNeRFContract(BaseContract):
         return torch.where(
             distance < 1,
             points,
-            (points / distance) * ( 2.0 - t )
+            (points / distance) * ( 2.0 - t ).clamp(-2.0 + 1e-5, 2.0 - 1e-5)
         )
 
 
@@ -225,7 +225,7 @@ class DoNeRFContract(BaseContract):
 
     def inverse_contract_distance(self, distance):
         distance = self.distance_activation(distance / 2.0) * 2.0
-        distance = distance.clamp(-2.0, 2.0)
+        distance = distance.clamp(-2.0 + 1e-5, 2.0 - 1e-5)
 
         return torch.pow(torch.abs(distance) + 1e-8, self.power) * torch.sign(distance) / self.fac
 

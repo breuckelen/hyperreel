@@ -62,6 +62,7 @@ class IntersectVoxelGrid(Intersect):
             self.z_scale = torch.tensor([1.0, 1.0, 1.0]).cuda()
 
         self.z_scale[self.z_scale == 0.0] = 1.0
+        #self.z_scale[:] = self.z_scale.min()
 
         #print("Initial, end in contracted space:", self.initial, self.end)
         #print("Samples in contracted space:", self.samples)

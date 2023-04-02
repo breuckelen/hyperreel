@@ -9,9 +9,12 @@ import torch.nn.functional as F
 import numpy as np
 
 
-def sort_z(z_vals, dim: int, descending: bool):
+def sort_z(z_vals, dim=-1, descending=False):
+    #z_vals, sort_idx = torch.sort(z_vals, dim=dim, descending=descending, stable=True)
+    #z_vals, sort_idx = torch.sort(z_vals, dim=dim, descending=descending, stable=False)
+
     sort_idx = torch.argsort(z_vals, dim=dim, descending=descending)
-    z_vals = torch.gather(z_vals, -1, sort_idx)
+    z_vals = torch.gather(z_vals, dim, sort_idx)
 
     return z_vals, sort_idx
 
@@ -65,12 +68,12 @@ def intersect_sphere(rays, origin, radius, continuous=False):
     t2 = (-b - torch.sqrt(disc + 1e-8)) / (2 * a)
 
     t1 = torch.where(
-        disc <= 0,
+        disc < 0,
         torch.zeros_like(t1),
         t1
     )
     t2 = torch.where(
-        disc <= 0,
+        disc < 0,
         torch.zeros_like(t2),
         t2
     )
@@ -171,11 +174,12 @@ def intersect_voxel_grid(
 
     # Calculate intersection
     t = (val - rays_o) / rays_d
-    #t = torch.where(
-    #    (t < 1e-5),
-    #    torch.zeros_like(t),
-    #    t
-    #)
+
+    t = torch.where(
+        (t < 1e-5),
+        torch.zeros_like(t),
+        t
+    )
 
     # Reshape
     t = t.view(t.shape[0], -1)

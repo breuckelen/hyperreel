@@ -265,16 +265,16 @@ def alpha2weights(alpha):
     return weights
 
 def scale_shift_color_all(rgb, color_scale, color_shift):
-    color_scale = color_scale.view(*rgb.shape)
-    color_shift = color_shift.view(*rgb.shape)
+    color_scale = color_scale.view(rgb.shape[0], -1, rgb.shape[-1])
+    color_shift = color_shift.view(rgb.shape[0], -1, rgb.shape[-1])
 
     #print(color_shift.mean((0, 1)))
 
     return rgb * (color_scale + 1.0) + color_shift
 
 def scale_shift_color_one(rgb, rgb_map, x):
-    color_scale = x['color_scale_global'].view(*rgb.shape)[:, 0, :]
-    color_shift = x['color_shift_global'].view(*rgb.shape)[:, 0, :]
+    color_scale = x['color_scale_global']
+    color_shift = x['color_shift_global']
 
     #print(color_shift.mean(0))
 

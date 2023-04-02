@@ -38,8 +38,8 @@ optimizers:
   color:
     optimizer: adam
     lr: 0.025
-    clip: False
-    clip_amount: 1.0
+    clip: True
+    clip_amount: 0.01
     momentum: 0.9
     weight_decay: 0
 
@@ -51,6 +51,8 @@ optimizers:
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]
+    #skip_opt_list: [20000]
+    #remove_skip_opt_list: [40000]
 
   color_impl:
     optimizer: adam
@@ -89,8 +91,8 @@ optimizers:
   embedding_impl:
     optimizer: adam
     lr: 0.00075
-    clip: False
-    clip_amount: 1.0
+    clip: True
+    clip_amount: 0.01
     momentum: 0.9
     weight_decay: 0
 
@@ -98,7 +100,8 @@ optimizers:
     warmup_multiplier: 1.0
     warmup_epochs: 0
 
-    decay_epoch: 50
+    #decay_epoch: 50
+    decay_epoch: 20
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]
@@ -115,7 +118,8 @@ optimizers:
     warmup_multiplier: 1.0
     warmup_epochs: 0
 
-    decay_epoch: 100
+    #decay_epoch: 50
+    decay_epoch: 20
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]

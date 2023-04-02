@@ -26,7 +26,7 @@ def uniform_weights_init(cfg):
     def init(m):
         if isinstance(m, torch.nn.Linear):
             torch.nn.init.uniform_(m.weight, a=-0.1, b=0.1)
-            torch.nn.init.uniform_(m.bias, a=-0.1, b=0.1)
+            #torch.nn.init.uniform_(m.bias, a=-0.1, b=0.1)
 
     return init
 
@@ -34,14 +34,55 @@ def xavier_uniform_weights_init(cfg):
     def init(m):
         if isinstance(m, torch.nn.Linear):
             torch.nn.init.xavier_uniform_(m.weight)
-            torch.nn.init.uniform_(m.bias, a=-0.01, b=0.01)
+            #torch.nn.init.uniform_(m.bias, a=-0.01, b=0.01)
 
     return init
 
+def xavier_normal_weights_init(cfg):
+    def init(m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.xavier_normal_(m.weight)
+            #torch.nn.init.uniform_(m.bias, a=-0.01, b=0.01)
+
+    return init
+
+def kaiming_uniform_weights_init(cfg):
+    def init(m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.kaiming_uniform_(m.weight)
+            #torch.nn.init.uniform_(m.bias, a=-0.01, b=0.01)
+
+    return init
+
+def kaiming_normal_weights_init(cfg):
+    def init(m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.kaiming_normal_(m.weight)
+            #torch.nn.init.uniform_(m.bias, a=-0.01, b=0.01)
+
+    return init
+
+def default(cfg):
+    def init(m):
+        if isinstance(m, torch.nn.Linear):
+            torch.nn.init.kaiming_uniform_(m.weight, a=np.sqrt(5))
+
+            if m.bias is not None:
+                fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(m.weight)
+                bound = 1 / np.sqrt(fan_in) if fan_in > 0 else 0
+                torch.nn.init.uniform_(m.bias, -bound, bound)
+    
+    return init
+
+
 weight_init_dict = {
     'none': no_init,
+    'default': default,
     'uniform': uniform_weights_init,
     'xavier_uniform': xavier_uniform_weights_init,
+    'xavier_normal': xavier_normal_weights_init,
+    'kaiming_uniform': kaiming_uniform_weights_init,
+    'kaiming_normal': kaiming_normal_weights_init,
 }
 
 def to8b(x): return (255*np.clip(x, 0, 1)).astype(np.uint8)
@@ -106,7 +147,7 @@ def get_scheduler(hparams, optimizer, iters_per_epoch):
         )
     elif hparams.lr_scheduler == 'cosine':
         scheduler = CosineAnnealingLR(
-            optimizer, T_max=hparams.num_epochs, eta_min=eps
+            optimizer, T_max=hparams.decay_epoch, eta_min=eps
         )
     elif hparams.lr_scheduler == 'poly':
         scheduler = LambdaLR(

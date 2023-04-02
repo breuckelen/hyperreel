@@ -300,6 +300,9 @@ class TensorVMNoSample(TensorVMSplit):
             dim=1,
         )
 
+        if self.constant_distance:
+            deltas = torch.ones_like(deltas) / deltas.shape[1]
+
         # Viewdirs
         viewdirs = x["viewdirs"].view(batch_size, nSamples, 3)
 
@@ -355,6 +358,10 @@ class TensorVMNoSample(TensorVMSplit):
             sigma[ray_valid] = valid_sigma
 
         alpha, weight, bg_weight = raw2alpha(sigma, deltas * self.distance_scale)
+
+        if self.constant_weight:
+            weight = torch.ones_like(weight) / weight.shape[1]
+
         app_mask = weight > self.rayMarch_weight_thres
 
         # Get colors
@@ -377,12 +384,12 @@ class TensorVMNoSample(TensorVMSplit):
 
         # Transform colors
         if 'color_scale' in x:
-            color_scale = x['color_scale'].view(rgb.shape[0], rgb.shape[1], 3)
-            color_shift = x['color_shift'].view(rgb.shape[0], rgb.shape[1], 3)
+            color_scale = x['color_scale']
+            color_shift = x['color_shift']
             rgb = scale_shift_color_all(rgb, color_scale, color_shift)
         elif 'color_transform' in x:
-            color_transform = x['color_transform'].view(rgb.shape[0], rgb.shape[1], 9)
-            color_shift = x['color_shift'].view(rgb.shape[0], rgb.shape[1], 3)
+            color_transform = x['color_transform']
+            color_shift = x['color_shift']
             rgb = transform_color_all(rgb, color_transform, color_shift)
 
         # Over composite

@@ -16,11 +16,11 @@ def get_warp_dimensions(
     sort=False,
     **kwargs
 ):
-    if sort:
+    if sort or k < embedding.shape[-1]:
         embedding_std = torch.std(embedding, 0, True)
         return list(torch.argsort(-embedding_std, axis=-1)[:k].cpu().numpy())
     else:
-        return list(range(0, embedding.shape[-1]))
+        return list(range(0, embedding.shape[-1]))[:k]
 
 def visualize_warp(
     embedding,

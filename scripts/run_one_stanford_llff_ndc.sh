@@ -8,7 +8,7 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_llff \
     experiment/training=stanford_tensorf \
     experiment.training.val_every=5 \
     experiment.training.render_every=10 \
-    experiment.training.ckpt_every=20 \
+    experiment.training.ckpt_every=10 \
     experiment.training.test_every=20 \
     ++experiment.training.num_epochs=100 \
     experiment/model=stanford_llff_z_plane$4 \
@@ -17,5 +17,6 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_llff \
     experiment.dataset.collection=$2 \
     experiment.dataset.lightfield_step=$3 \
     experiment.params.name=stanford_llff_$2_step_$3$4 \
+    +experiment/visualizers/embedding=default \
     +experiment/regularizers/tensorf=tv_4000
 

@@ -21,4 +21,7 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=stanford_llff \
     experiment.params.save_results=True \
     experiment.training.num_iters=100 \
     experiment.training.num_epochs=1000 \
+    experiment.training.render_ray_chunk=262144 \
+    experiment.training.ray_chunk=262144 \
+    experiment.training.net_chunk=262144 \
     experiment.params.render_only=True

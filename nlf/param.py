@@ -256,6 +256,40 @@ class PlueckerParam(nn.Module):
         self.cur_iter = i
 
 
+class DepthParam(nn.Module):
+    def __init__(
+        self,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.in_channels = cfg.in_channels if 'in_channels' in cfg else 7
+        self.out_channels = cfg.n_dims if 'n_dims' in cfg else 3
+
+        self.origin = torch.tensor(cfg.origin if 'origin' in cfg else [0.0, 0.0, 0.0], device='cuda')
+
+        if 'contract' in cfg:
+            self.contract_fn = contract_dict[cfg.contract.type](
+                cfg.contract,
+                **kwargs
+            )
+        else:
+            self.contract_fn = contract_dict['identity']({})
+
+    def forward(self, rays):
+        rays_o, rays_d = rays[..., :3] - self.origin.unsqueeze(0), rays[..., 3:6]
+        #rays_d = torch.nn.functional.normalize(rays_d, p=2.0, dim=-1)
+
+        depth = rays[..., 6:7]
+        points = rays_o + depth * rays_d
+        points = self.contract_fn.contract_points(points)
+        return points
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
 class ContractPointsParam(nn.Module):
     def __init__(
         self,
@@ -451,6 +485,7 @@ ray_param_dict = {
     'voxel_center': VoxelCenterParam,
     'z_slice': ZSliceParam,
     'contract_points': ContractPointsParam,
+    'depth': DepthParam,
 }
 
 

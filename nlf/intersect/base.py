@@ -75,6 +75,8 @@ class Intersect(nn.Module):
         self.residual_z = cfg.residual_z if 'residual_z' in cfg else False
         self.residual_distance = cfg.residual_distance if 'residual_distance' in cfg else False
         self.sort = cfg.sort if 'sort' in cfg else False
+        self.sort_fixed = cfg.sort_fixed if 'sort_fixed' in cfg else False
+        self.generate_offsets = cfg.generate_offsets if 'generate_offsets' in cfg else False
         self.clamp = cfg.clamp if 'clamp' in cfg else False
 
         self.use_dataset_bounds = cfg.use_dataset_bounds if 'use_dataset_bounds' in cfg else False
@@ -87,11 +89,15 @@ class Intersect(nn.Module):
         # Minimum intersect distance
         if self.use_dataset_bounds:
             self.near = cfg.near if 'near' in cfg else kwargs['system'].dm.train_dataset.near
+            self.far = cfg.far if 'far' in cfg else kwargs['system'].dm.train_dataset.far * 1.5
         else:
             self.near = cfg.near if 'near' in cfg else 0.0
+            self.far = cfg.far if 'far' in cfg else float("inf")
 
-        #self.near = cfg.near if 'near' in cfg else 0.0
+        #self.near = 0.0 # TODO: Remove
         self.far = cfg.far if 'far' in cfg else float("inf")
+
+        self.min_sep = cfg.min_sep if 'min_sep' in cfg else 0.0
 
         # Sorting
         self.weight_fn = weight_fn_dict[cfg.weight_fn.type](cfg.weight_fn) if 'weight_fn' in cfg else None
@@ -138,18 +144,10 @@ class Intersect(nn.Module):
             z_vals = 1.0 / z_vals
 
         return z_vals
-
-    def forward(self, rays: torch.Tensor, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
-        rays = torch.cat(
-            [
-                rays[..., :3] - self.origin[None],
-                rays[..., 3:6],
-            ],
-            dim=-1
-        )
-
+    
+    def get_intersect_distances(self, rays, z_vals, x, render_kwargs):
         ## Z value processing
-        z_vals = x['z_vals'].view(rays.shape[0], -1)
+        z_vals = z_vals.view(rays.shape[0], -1)
 
         # Z activation and sigma
         if self.use_sigma and self.in_density_field in x:
@@ -164,6 +162,9 @@ class Intersect(nn.Module):
         if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) and self.cur_iter < self.dropout_stop_iter and self.training:
             z_vals = torch.zeros_like(z_vals)
 
+        #print(torch.abs(z_vals).mean()) # TODO: Remove
+        #print(torch.abs(z_vals.view(z_vals.shape[0], -1, 3)[..., -1]).mean()) # TODO: Remove
+
         # Add samples and contract
         z_vals = self.process_z_vals(z_vals)
         #print(z_vals.view(z_vals.shape[0], -1, 4)[0])
@@ -177,8 +178,8 @@ class Intersect(nn.Module):
                 #print(last_distance[0])
                 last_z = self.distance_to_z(rays, last_distance)
                 #print(last_z[0])
-            
-            z_vals = z_vals.view(z_vals.shape[0], -1, last_z.shape[-1]) + last_z
+
+            z_vals = z_vals.view(z_vals.shape[0], last_z.shape[1], -1, last_z.shape[-1]) + last_z.unsqueeze(2)
             z_vals = z_vals.view(z_vals.shape[0], -1)
 
         # Get distances
@@ -207,12 +208,40 @@ class Intersect(nn.Module):
             dists
         )
 
+        return dists, mask, z_vals
+
+    def forward(self, rays: torch.Tensor, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        rays = torch.cat(
+            [
+                rays[..., :3] - self.origin[None],
+                rays[..., 3:6],
+            ],
+            dim=-1
+        )
+
+        # Get intersect distances, valid mask
+        dists, mask, z_vals = self.get_intersect_distances(
+            rays, x['z_vals'], x, render_kwargs
+        )
+
+        if self.sort_fixed or self.generate_offsets:
+            dists_fixed, mask_fixed, z_vals_fixed = self.get_intersect_distances(
+                rays, torch.zeros_like(x['z_vals']), x, render_kwargs
+            )
+
         # Sort
         if self.sort:
-            dists, sort_idx = sort_z(dists, 1, False)
+            dists, sort_idx = sort_z(dists)
+
+            if self.sort_fixed:
+                dists_fixed, sort_idx = sort_z(dists_fixed)
+            elif self.generate_offsets:
+                dists_fixed = dists_fixed.unsqueeze(-1)
+                dists_fixed = sort_with(sort_idx, dists_fixed)
 
             for output_key in self.sort_outputs:
-                x[output_key] = sort_with(sort_idx, x[output_key])
+                if output_key in x and len(x[output_key].shape) == 3:
+                    x[output_key] = sort_with(sort_idx, x[output_key])
 
         # Mask again
         dists = dists.unsqueeze(-1)
@@ -221,18 +250,8 @@ class Intersect(nn.Module):
         # Get points
         points = rays[..., None, :3] + rays[..., None, 3:6] * dists
 
-        # Normalize output
-        if self.normalize:
-            r = (z_vals[..., None] + 1)
-            fac = 1.0 / torch.sqrt(((-r + 1) * (-r + 1) + r * r) + 1e-8)
-
-            points = torch.cat(
-                [
-                    points[..., :2] * fac,
-                    points[..., 2:3]
-                ],
-                -1
-            )
+        if self.generate_offsets:
+            points_fixed = rays[..., None, :3] + rays[..., None, 3:6] * dists_fixed
 
         # Contract
         dists_no_contract = dists
@@ -242,6 +261,12 @@ class Intersect(nn.Module):
                 rays[..., :3], points, dists
             )
             dists = torch.where(mask, torch.zeros_like(dists), dists)
+
+            if self.generate_offsets:
+                points_fixed, dists_fixed = self.contract_fn.contract_points_and_distance(
+                    rays[..., :3], points_fixed, dists_fixed
+                )
+                dists_fixed = torch.where(mask, torch.zeros_like(dists_fixed), dists_fixed)
         
         if self.out_points is not None:
             x[self.out_points] = points
@@ -255,7 +280,46 @@ class Intersect(nn.Module):
         x['distances_no_contract'] = dists_no_contract
         x['z_vals'] = z_vals
 
+        if self.generate_offsets:
+            x['point_offset_from_fixed'] = points - points_fixed
+
         return x
+    
+    def filter_min_separation(self, dists, points, x, render_kwargs):
+        # Minimum separation
+        if self.min_sep > 0.0:
+            # Mask
+            sep = dists[:, 1:] - dists[:, :-1]
+            mask = sep < self.min_sep
+            mask = torch.cat(
+                [
+                    torch.zeros_like(mask[:, :1]),
+                    mask
+                ],
+                dim=1
+            )
+
+            # Mask distances, points
+            dists = torch.where(mask, torch.zeros_like(dists), dists)
+            dists_no_contract = torch.where(mask, torch.zeros_like(dists_no_contract), dists_no_contract)
+
+            # Squeeze
+            dists = dists.squeeze(-1)
+            dists_no_contract = dists_no_contract.squeeze(-1)
+
+            # Sort
+            if self.sort:
+                dists, sort_idx = sort_z(dists, 1, False)
+                dists = dists.unsqueeze(-1)
+
+                dists_no_contract = sort_with(sort_idx, dists_no_contract.unsqueeze(-1))
+                points = sort_with(sort_idx, points)
+
+                for output_key in self.sort_outputs:
+                    if output_key in x and len(x[output_key].shape) == 3:
+                        x[output_key] = sort_with(sort_idx, x[output_key])
+        
+        return dists, points
     
     def distance_to_z(self, rays, distance):
         pass

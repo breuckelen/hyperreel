@@ -145,6 +145,8 @@ class TensorBase(torch.nn.Module):
         self.white_bg = cfg.white_bg if 'white_bg' in cfg else 0
         self.black_bg = cfg.black_bg if 'black_bg' in cfg else 0
         self.ndc_ray = cfg.ndc_ray if 'ndc_ray' in cfg else 0
+        self.constant_distance = cfg.constant_distance if 'constant_distance' in cfg else False
+        self.constant_weight = cfg.constant_weight if 'constant_weight' in cfg else False
 
         self.register_buffer('aabb', torch.tensor(cfg.aabb).to(self.device))
 

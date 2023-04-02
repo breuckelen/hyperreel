@@ -11,12 +11,10 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=donerf_large \
     experiment.training.render_every=1 \
     experiment.training.test_every=1 \
     experiment.training.num_epochs=1000 \
-    experiment/model=donerf_cylinder \
+    experiment/model=donerf$4 \
     experiment.params.print_loss=True \
     experiment.dataset.collection=$2 \
-    experiment.params.save_results=False \
+    experiment.params.save_results=True \
     experiment.training.num_iters=100 \
-    experiment.params.render_only=True
-
-
-
+    experiment.params.render_only=True \
+    experiment.params.name=donerf_$2_skip_$3$4

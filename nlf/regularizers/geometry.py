@@ -34,6 +34,9 @@ class GeometryRegularizer(BaseRegularizer):
         # Origin
         self.origin = torch.tensor(cfg.origin if 'origin' in cfg else [0.0, 0.0, 0.0], device='cuda')
 
+        # Render weights
+        self.use_render_weights = cfg.use_render_weights if 'use_render_weights' in cfg else False
+
         # Contract function
         if 'contract' in cfg:
             self.contract_fn = contract_dict[cfg.contract.type](
@@ -57,10 +60,82 @@ class GeometryRegularizer(BaseRegularizer):
         pred_points = outputs[self.fields[0]]
         pred_points = pred_points.view(pred_distance.shape[0], pred_distance.shape[1], -1)
 
+        # Get ground truth points
+        gt_depth = batch['depth']
+
+        rays_o, rays_d = rays[..., :3] - self.origin[None], rays[..., 3:6]
+        rays_d = torch.nn.functional.normalize(rays_d, p=2.0, dim=-1)
+        gt_points = self.contract_fn.contract_points(rays_o + gt_depth * rays_d)
+
+        # Compute mask
+        mask = (gt_depth != 0.0) \
+            & (pred_distance != 0.0)
+
         # Weights
-        render_weights = outputs['render_weights'].reshape(
-            pred_points.shape[0], -1
-        )
+        if self.use_render_weights:
+            render_weights = outputs['render_weights'].reshape(
+                pred_points.shape[0], -1
+            )
+        else:
+            render_weights = torch.ones_like(pred_points[..., 0])
+
+        # Loss
+        diff = torch.square(pred_points - gt_points.unsqueeze(1)).sum(-1)
+        diff = diff * mask.float() * render_weights 
+
+        if self.num_points > 0:
+            diff = torch.sort(diff, dim=-1)[0][..., :self.num_points]
+
+        loss = torch.mean(diff)
+        return loss
+
+    @property
+    def render_kwargs(self):
+        return {
+            'fields': self.fields + (['render_weights'] if self.use_render_weights else []),
+            'no_over_fields': self.fields + (['render_weights'] if self.use_render_weights else []),
+        }
+
+
+class GeometryOverRegularizer(BaseRegularizer):
+    def __init__(
+        self,
+        system,
+        cfg
+    ):
+        super().__init__(system, cfg)
+
+        # Setup losses
+        self.cfg = cfg
+
+        # Variables
+        self.fields = list(cfg.fields)
+
+        # Origin
+        self.origin = torch.tensor(cfg.origin if 'origin' in cfg else [0.0, 0.0, 0.0], device='cuda')
+
+        # Contract function
+        if 'contract' in cfg:
+            self.contract_fn = contract_dict[cfg.contract.type](
+                cfg.contract, system=system
+            )
+        else:
+            self.contract_fn = contract_dict['identity']({})
+
+        # How many points to use
+        self.num_points = cfg.num_points if 'num_points' in cfg else -1
+
+    def _loss(self, batch, outputs, batch_idx):
+        # Get coords
+        rays = batch['coords']
+        rays = torch.clone(rays.view(-1, rays.shape[-1]))
+
+        # Render points
+        pred_distance = outputs[self.fields[1]]
+        pred_distance = pred_distance.view(pred_distance.shape[0], -1)
+
+        pred_points = outputs[self.fields[0]]
+        pred_points = pred_points.view(pred_distance.shape[0], pred_distance.shape[1], -1)
 
         # Get ground truth points
         gt_depth = batch['depth']
@@ -73,15 +148,19 @@ class GeometryRegularizer(BaseRegularizer):
         mask = (gt_depth != 0.0) \
             & (pred_distance != 0.0)
 
-        ## Loss 1
-        #diff = torch.square(pred_points - gt_points.unsqueeze(1)).sum(-1)
-        #diff = diff * mask.float() * render_weights 
+        # Weights
+        render_weights = outputs['render_weights'].reshape(
+            pred_points.shape[0], -1
+        )
 
-        # Loss 2
+        # Loss
         pred_points = (render_weights.unsqueeze(-1) * pred_points).sum(1)
         diff = torch.square(pred_points - gt_points).sum(-1)
         diff = diff * (gt_depth != 0.0).float()
 
+        if self.num_points > 0:
+            diff = torch.sort(diff, dim=-1)[0][..., :self.num_points]
+        
         loss = torch.mean(diff)
         return loss
 
@@ -203,7 +282,7 @@ class OffsetFeedbackRegularizer(BaseRegularizer):
         self.cfg = cfg
 
         # Variables
-        self.student_fields = ["point_offset_3d"] 
+        self.student_fields = ["point_offset_3d", "point_offset_from_fixed"] 
         self.teacher_fields = ["point_offset"]
         self.sizes = list(cfg.sizes) if 'sizes' in cfg else [3 for s in self.student_fields]
         self.weights = list(cfg.weights) if 'weights' in cfg else [1.0 for s in self.student_fields]
@@ -215,25 +294,28 @@ class OffsetFeedbackRegularizer(BaseRegularizer):
 
         # Weights
         render_weights = outputs['render_weights']
-        #render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
+        render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
 
         # 3D Point Offsets
-        student_points = outputs[self.student_fields[0]]
-        student_points = student_points.view(student_points.shape[0], -1, 1, self.sizes[-1])
+        student_points_1 = outputs[self.student_fields[0]]
+        student_points_1 = student_points_1.view(student_points_1.shape[0], -1, 1, self.sizes[-1])
+
+        student_points_2 = outputs[self.student_fields[1]]
+        student_points_2 = student_points_2.view(student_points_2.shape[0], -1, 1, self.sizes[-1])
 
         # View Dependent Point Offsets
         teacher_points = outputs[self.teacher_fields[0]]
-        teacher_points = teacher_points.view(teacher_points.shape[0], student_points.shape[1], -1, self.sizes[-1])
+        teacher_points = teacher_points.view(teacher_points.shape[0], student_points_1.shape[1], -1, self.sizes[-1])
 
         # Loss
         render_weights = render_weights.detach()
-        render_weights = render_weights.view(render_weights.shape[0], student_points.shape[1], -1)
+        render_weights = render_weights.view(render_weights.shape[0], student_points_1.shape[1], -1)
 
-        diff = torch.square(student_points - (teacher_points + student_points)).sum(-1)
-        #diff = diff + torch.square(teacher_points).sum(-1)
-
-        #diff = torch.abs(student_points - (teacher_points + student_points)).sum(-1)
-        ##diff = diff + torch.abs(teacher_points).sum(-1)
+        diff = torch.square(
+            (student_points_1 + student_points_2) \
+                - (teacher_points + student_points_1.clone().detach() + student_points_2.clone().detach())
+        ).sum(-1)
+        diff = diff + torch.abs(teacher_points).sum(-1)
 
         diff = (diff * render_weights).sum((-2, -1))
         total_loss = torch.mean(diff) * self.weights[0]

@@ -8,6 +8,7 @@ import os
 
 import torch
 import numpy as np
+import cv2
 
 from PIL import Image
 
@@ -306,16 +307,25 @@ class StanfordLLFFDataset(LLFFDataset):
 
     def read_meta(self):
         # Camera coords
+        #self.image_paths = sorted(
+        #    self.pmgr.ls(self.root_dir)
+        #)
         self.image_paths = sorted(
-            self.pmgr.ls(self.root_dir)
+            self.pmgr.ls(os.path.join(self.root_dir, "images"))
         )
+        self.point_paths = sorted(
+            self.pmgr.ls(os.path.join(self.root_dir, "points"))
+        )
+        #self.point_paths = sorted(
+        #    self.pmgr.ls(os.path.join(self.root_dir, "distances"))
+        #)
 
         # Get width, height
         if self.img_wh is None:
             image_path = self.image_paths[0]
 
             with self.pmgr.open(
-                os.path.join(self.root_dir, image_path),
+                os.path.join(self.root_dir, "images", image_path),
                 'rb'
             ) as im_file:
                 img = np.array(Image.open(im_file).convert('RGB'))
@@ -418,10 +428,12 @@ class StanfordLLFFDataset(LLFFDataset):
 
         if self.split == "val" or self.split == "test":
             self.image_paths = [self.image_paths[i] for i in val_indices]
+            self.point_paths = [self.point_paths[i] for i in val_indices]
             self.intrinsics = self.intrinsics[val_indices]
             self.poses = self.poses[val_indices]
         elif self.split == "train":
             self.image_paths = [self.image_paths[i] for i in train_indices]
+            self.point_paths = [self.point_paths[i] for i in train_indices]
             self.intrinsics = self.intrinsics[train_indices]
             self.poses = self.poses[train_indices]
 
@@ -519,6 +531,10 @@ class StanfordLLFFDataset(LLFFDataset):
         else:
             rays = torch.cat([rays_o, rays_d], dim=-1)
 
+        # Add points
+        points = self.get_points(idx)
+        rays = torch.cat([rays, points], dim=-1)
+
         # Add camera idx
         rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * cam_idx], dim=-1)
 
@@ -528,7 +544,8 @@ class StanfordLLFFDataset(LLFFDataset):
     def get_rgb(self, idx):
         image_path = self.image_paths[idx]
 
-        with self.pmgr.open(os.path.join(self.root_dir, image_path), "rb") as im_file:
+        #with self.pmgr.open(os.path.join(self.root_dir, image_path), "rb") as im_file:
+        with self.pmgr.open(os.path.join(self.root_dir, "images", image_path), "rb") as im_file:
             img = Image.open(im_file)
             img = img.convert("RGB")
 
@@ -542,3 +559,29 @@ class StanfordLLFFDataset(LLFFDataset):
         img = img.view(3, -1).permute(1, 0)
 
         return img
+
+    def get_points(self, idx):
+        point_path = self.point_paths[idx]
+        point_path = os.path.join(self.root_dir, "points", point_path)
+        #point_path = os.path.join(self.root_dir, "distances", point_path)
+
+        if not self.pmgr.exists(point_path):
+            return torch.zeros_like(self.directions.view(-1, 3)[..., 0:3])
+            #return torch.zeros_like(self.directions.view(-1, 3)[..., 0:1])
+
+        with self.pmgr.open(
+            point_path,
+            'rb'
+        ) as point_file:
+            img = np.load(point_file).transpose(1, 2, 0)
+            #img = np.load(point_file)
+
+        # Resize
+        img = cv2.resize(img, self._img_wh, interpolation=cv2.INTER_LINEAR)
+
+        if self.img_wh[0] != self._img_wh[0] or self.img_wh[1] != self._img_wh[1]:
+            img = cv2.resize(img, self.img_wh, interpolation=cv2.INTER_LINEAR)
+
+        # Return
+        return torch.tensor(img.reshape(-1, img.shape[-1]))
+        #return torch.tensor(img.reshape(-1, 1))

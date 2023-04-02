@@ -52,8 +52,7 @@ embedding:
 
       outputs:
         z_vals:
-          channels: 8
-          #channels: 1
+          channels: 4
 
         sigma:
           channels: 1
@@ -63,8 +62,6 @@ embedding:
             start_value: 1.0
             window_epochs: 3
             wait_epochs: 0
-            #window_epochs: 0
-            #wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -77,9 +74,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
-            wait_epochs: 1
-            #window_epochs: 0
-            #wait_epochs: 0
+            wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -151,9 +146,8 @@ embedding:
         #type: euclidean_distance_unified
 
         sort: True
-        outward_facing: False
-        use_disparity: False
-        max_axis: False
+        #sort_outputs: [point_sigma, point_offset]
+        sort_outputs: [point_sigma, point_offset, color_scale, color_shift]
 
         use_sigma: True
 
@@ -206,25 +200,25 @@ color:
 
     # Density activation
     fea2denseAct: relu
-    #distance_scale: 16.0
-    distance_scale: 8.0
+    distance_scale: 16.0
     density_shift: 0.0
 
     # Grid bounds
     aabb: [[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]]
 
     # Grid size and upsampling
-    N_voxel_init: 2097152
-    #N_voxel_final: 216000000
-    N_voxel_final: 64000000
+    #N_voxel_init: 2097152
+    N_voxel_init: 512000
+    #N_voxel_final: 64000000
+    N_voxel_final: 216000000
 
 
     upsamp_list: [4000,6000,8000,10000,12000]
     lr_upsample_reset: True
 
     # Thresholding
-    update_AlphaMask_list: []
-    #update_AlphaMask_list: [4000,8000]
+    #update_AlphaMask_list: []
+    update_AlphaMask_list: [4000,8000]
     rm_weight_mask_thre: 0
     alpha_mask_thre: 1e-3
 

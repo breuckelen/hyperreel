@@ -47,8 +47,9 @@ class TensoRF(BaseRegularizer):
         self.update_AlphaMask_list = cfg.update_AlphaMask_list
 
         self.lr_factor = self.cfg.lr_decay_target_ratio**(1/self.cfg.n_iters)
-        self.total_num_tv_iters = self.cfg.total_num_tv_iters if 'total_num_tv_iters' in self.cfg else \
-            int(np.round( (np.log(1e-4) / np.log(self.cfg.lr_decay_target_ratio)) * self.cfg.n_iters ))
+        #self.total_num_tv_iters = self.cfg.total_num_tv_iters if 'total_num_tv_iters' in self.cfg else \
+        #    int(np.round( (np.log(1e-4) / np.log(self.cfg.lr_decay_target_ratio)) * self.cfg.n_iters ))
+        self.total_num_tv_iters = -1
 
         self.L1_reg_weight = self.cfg.L1_weight_initial
         self.TV_weight_density = self.cfg.TV_weight_density
@@ -72,7 +73,7 @@ class TensoRF(BaseRegularizer):
             total_loss += self.L1_reg_weight * loss_reg_L1
 
         # Return if decayed TV enough
-        if self.cur_iter > self.total_num_tv_iters:
+        if self.cur_iter > self.total_num_tv_iters and self.total_num_tv_iters > 0:
             return total_loss
 
         # TV Loss

@@ -536,6 +536,12 @@ class INRSystem(LightningModule):
             if 'reset_opt_list' in opt_cfg and (train_iter in opt_cfg.reset_opt_list):
                 needs_reset = True
 
+            elif 'skip_opt_list' in opt_cfg and (train_iter in opt_cfg.skip_opt_list):
+                needs_reset = True
+
+            elif 'remove_skip_opt_list' in opt_cfg and (train_iter in opt_cfg.remove_skip_opt_list):
+                needs_reset = True
+
         return needs_reset or (train_iter == 0)
 
     def reset_optimizers(self, train_iter):
@@ -549,6 +555,7 @@ class INRSystem(LightningModule):
 
             if 'skip_opt_list' in opt_cfg and (train_iter in opt_cfg.skip_opt_list):
                 self.skip_opt_list.append(key)
+
             elif 'remove_skip_opt_list' in opt_cfg and (train_iter in opt_cfg.remove_skip_opt_list):
                 self.skip_opt_list = [skip_key for skip_key in self.skip_opt_list if skip_key != key]
 
@@ -708,9 +715,24 @@ class INRSystem(LightningModule):
             optimizers = [optimizers]
 
         # Gradient descent step
-        for opt in optimizers: opt.zero_grad()
+        for opt, key in zip(optimizers, self.optimizer_groups.keys()):
+            if key not in self.skip_opt_list:
+                opt.zero_grad()
+
         self.manual_backward(loss)
-        for opt in optimizers: opt.step()
+
+        for opt, key in zip(optimizers, self.optimizer_groups.keys()):
+            if key not in self.skip_opt_list:
+                opt_cfg = self.optimizer_configs[key]
+
+                if opt_cfg.clip:
+                    torch.nn.utils.clip_grad_norm_(
+                        opt.param_groups[0]['params'],
+                        opt_cfg.clip_amount
+                    )
+
+                opt.step()
+
 
         ## Scheduler step
         #if self.training_started:
@@ -941,6 +963,10 @@ class INRSystem(LightningModule):
 
         all_images['eval/pred'] = img
         all_images['eval/gt'] = img_gt
+
+        if 'depth' in batch:
+            depth = batch['depth'].view(H, W).cpu().numpy()
+            all_images['eval/depth'] = depth / depth.max()
 
         # Helper for adding outputs
         def _add_outputs(outputs):

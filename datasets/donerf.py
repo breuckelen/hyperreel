@@ -44,6 +44,8 @@ class DONeRFDataset(Base5DDataset):
         self.correct_poses = cfg.dataset.correct_poses if 'correct_poses' in cfg.dataset else False
         self.center_poses = cfg.dataset.center_poses if 'center_poses' in cfg.dataset else False
         self.use_ndc = cfg.dataset.use_ndc if 'use_ndc' in cfg.dataset else False
+        self.train_skip = cfg.dataset.train_skip if 'train_skip' in cfg.dataset else 1
+        self.depth_downsample = cfg.dataset.depth_downsample if 'depth_downsample' in cfg.dataset else None
 
         super().__init__(cfg, split, **kwargs)
 
@@ -102,6 +104,8 @@ class DONeRFDataset(Base5DDataset):
 
         if split == 'val':
             self.meta['frames'] = self.meta['frames'][:self.val_num]
+        elif split == 'train':
+            self.meta['frames'] = self.meta['frames'][::self.train_skip]
 
         # Load dataset info
         with self.pmgr.open(
@@ -140,8 +144,11 @@ class DONeRFDataset(Base5DDataset):
         if self.use_ndc or self.correct_poses:
             self.poses, _ = center_poses_with_rotation_only(self.poses, self.train_poses)
         
-            if self.dataset_cfg.collection in ['pavillon'] and self.split == 'render':
-                self.poses[..., :3, -1] *= 0.35
+            if self.split == "render":
+                if self.dataset_cfg.collection in ['pavillon']:
+                    self.poses[..., :3, -1] *= 1.0
+                else:
+                    self.poses[..., :3, -1] *= 2.0
 
         # Ray directions for all pixels, same for all images (same H, W, focal)
         self.centered_pixels = True
@@ -180,8 +187,12 @@ class DONeRFDataset(Base5DDataset):
 
         # Calculate bounds
         mask = (self.all_depth != 0.0)
+
         self.bbox_min = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).min(0)[0]
         self.bbox_max = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).max(0)[0]
+
+        #self.bbox_min = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).max(0)[0]
+        #self.bbox_max = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).min(0)[0]
 
         #self.near = float(self.all_depth[mask].min())
         #self.far = float(self.all_depth[mask].max())
@@ -226,9 +237,13 @@ class DONeRFDataset(Base5DDataset):
         rays_o, rays_d = get_rays(self.directions, c2w)
 
         if self.use_ndc:
-            return self.to_ndc(torch.cat([rays_o, rays_d], dim=-1))
+            coords = self.to_ndc(torch.cat([rays_o, rays_d], dim=-1))
         else:
-            return torch.cat([rays_o, rays_d], dim=-1)
+            coords = torch.cat([rays_o, rays_d], dim=-1)
+        
+        depth = self.get_depth(idx)
+
+        return torch.cat([coords, depth], dim=-1)
 
     def get_rgb(self, idx):
         image_path = self.image_paths[idx]
@@ -252,37 +267,46 @@ class DONeRFDataset(Base5DDataset):
 
     def get_depth(self, idx):
         image_path = self.image_paths[idx]
+        image_path = os.path.join(self.root_dir, f'{image_path}_depth.npz')
+
+        if not self.pmgr.exists(image_path):
+            return torch.zeros_like(self.directions.view(-1, 3)[..., 0:1])
 
         with self.pmgr.open(
-            os.path.join(self.root_dir, f'{image_path}_depth.npz'),
+            image_path,
             'rb'
         ) as depth_file:
             with np.load(depth_file) as depth:
-                img = depth['arr_0'].reshape(800, 800)
+                depth = depth['arr_0'].reshape(800, 800)
 
         # Resize
-        img = cv2.resize(img, self._img_wh, interpolation=cv2.INTER_NEAREST)
+        if self.depth_downsample != None:
+            img_wh = (self._img_wh[0] // self.depth_downsample, self._img_wh[1] // self.depth_downsample)
+            depth = cv2.resize(depth, img_wh, interpolation=cv2.INTER_NEAREST)
+            depth[depth < self.near] = self.near
+            depth[depth > self.far] = self.far
+            depth = cv2.resize(depth, self.img_wh, interpolation=cv2.INTER_NEAREST)
+        else:
+            depth = cv2.resize(depth, self._img_wh, interpolation=cv2.INTER_NEAREST)
 
         if self.img_wh[0] != self._img_wh[0] or self.img_wh[1] != self._img_wh[1]:
-            img = cv2.resize(img, self.img_wh, interpolation=cv2.INTER_NEAREST)
+            depth = cv2.resize(depth, self.img_wh, interpolation=cv2.INTER_NEAREST)
 
         # Flip
-        img = np.flip(img, 0)
+        depth = np.flip(depth, 0)
+
+        # Depth to distance
+        depth = depth * np.array(torch.linalg.norm(self.directions, dim=-1))
+
+        # Change zero values
+        depth[depth < self.near] = self.near
+        depth[depth > self.far] = self.far
 
         # Transform
-        img = self.transform(np.copy(img))
+        depth = self.transform(np.copy(depth))
 
         # Return
-        depth = img.view(1, -1).permute(1, 0)
-        directions = torch.nn.functional.normalize(self.directions, p=2.0, dim=-1).view(-1, 3)
-        depth = depth / torch.abs(directions[..., 2:3])
-
-        #depth[depth < self.near] = self.near
-        #depth[depth > self.far] = self.far
-        depth[depth < self.near] = 0.0
-        depth[depth > self.far] = 0.0
-
-        return depth
+        return depth.view(-1, 1)
 
     def get_points(self, idx):
         rays = self.all_coords[idx][..., :6].reshape(-1, 6)

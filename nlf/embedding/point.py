@@ -57,6 +57,9 @@ class PointPredictionEmbedding(nn.Module):
 
         # Inputs
         self.in_z_channels = cfg.in_z_channels if 'in_z_channels' in cfg else 1
+        self.net_in_z_channels = cfg.net_in_z_channels if 'net_in_z_channels' in cfg else self.in_z_channels
+        self.in_z_per_net_in = self.in_z_channels // self.net_in_z_channels
+
         self.inputs = cfg.inputs
         self.input_names = list(self.inputs.keys())
         self.input_shapes = [self.inputs[k] for k in self.inputs.keys()]
@@ -98,13 +101,13 @@ class PointPredictionEmbedding(nn.Module):
             self.in_channels += pe.out_channels
 
         # Outputs
-        self.out_z_channels = cfg.out_z_channels if 'out_z_channels' in cfg else 1
+        self.out_z_channels = cfg.out_z_channels if 'out_z_channels' in cfg else self.net_in_z_channels
         self.outputs = cfg.outputs
         self.output_names = list(self.outputs.keys())
         self.output_shapes = [self.outputs[k].channels for k in self.outputs.keys()]
         self.out_channels = sum(self.output_shapes)
         self.total_out_channels = self.out_channels * self.out_z_channels
-        self.out_z_per_in_z = self.out_z_channels // self.in_z_channels
+        self.out_z_per_in_z = self.out_z_channels // self.net_in_z_channels
 
         # Net
         if 'depth' in cfg.net:
@@ -112,7 +115,7 @@ class PointPredictionEmbedding(nn.Module):
             cfg.net['linear_last'] = False
 
         self.net = net_dict[cfg.net.type](
-            self.in_channels,
+            self.in_channels * self.in_z_per_net_in,
             self.out_channels * self.out_z_per_in_z,
             cfg.net,
             group=self.group
@@ -162,7 +165,7 @@ class PointPredictionEmbedding(nn.Module):
             )
             param_inputs[-1] = param_inputs[-1].view(-1, param_inputs[-1].shape[-1])
 
-        inputs = torch.cat(param_inputs, -1).view(-1, self.in_channels)
+        inputs = torch.cat(param_inputs, -1).view(-1, self.in_channels * self.in_z_per_net_in)
 
         if self.filter:
             # Run on valid
@@ -240,6 +243,8 @@ class AddFieldsEmbedding(nn.Module):
         self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
         self.cfg = cfg
 
+        self.broadcast_size = cfg.broadcast_size if 'broadcast_size' in cfg else None
+
         self.fields = list(cfg.fields.keys())
         self.field_channels = []
 
@@ -254,14 +259,18 @@ class AddFieldsEmbedding(nn.Module):
 
     def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
         out = 0.0
-        broadcast_size = None
 
         for i, field_key in enumerate(self.fields):
             start_channel, end_channel = self.field_channels[i]
             cur_field = x[field_key]
 
-            if broadcast_size is None:
-                broadcast_size = cur_field.shape[1]
+            if self.broadcast_size is not None and i == 0:
+                out = cur_field.new_zeros(
+                    cur_field.shape[0],
+                    cur_field.shape[1],
+                    self.broadcast_size // cur_field.shape[1],
+                    cur_field.shape[-1]
+                )
 
             if len(cur_field.shape) == 2:
                 out = out + cur_field[..., start_channel:end_channel].reshape(
@@ -269,7 +278,7 @@ class AddFieldsEmbedding(nn.Module):
                 )
             else:
                 out = out + x[field_key][..., start_channel:end_channel].reshape(
-                    cur_field.shape[0], cur_field.shape[1] // broadcast_size, -1, (end_channel - start_channel)
+                    cur_field.shape[0], cur_field.shape[1], -1, (end_channel - start_channel)
                 )
         
         x[self.out_field] = out.reshape(out.shape[0], -1, out.shape[-1])
@@ -380,7 +389,8 @@ class PointOffsetEmbedding(nn.Module):
         self.cfg = cfg
 
         # In & out fields
-        self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
+        #self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
+        self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'point_sigma'
 
         self.in_offset_field = cfg.in_offset_field if 'in_offset_field' in cfg else 'point_offset'
         self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else self.in_offset_field
@@ -422,6 +432,138 @@ class PointOffsetEmbedding(nn.Module):
 
         if self.out_offset_field is not None:
             x[self.out_offset_field] = point_offset
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class PointScaleEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # In & out fields
+        #self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
+        self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'point_sigma'
+
+        self.in_scale_field = cfg.in_scale_field if 'in_scale_field' in cfg else 'point_scale'
+        self.out_scale_field = cfg.out_scale_field if 'out_scale_field' in cfg else self.in_scale_field
+
+        self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
+        self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else self.in_points_field
+        self.save_points_field = cfg.save_points_field if 'save_points_field' in cfg else None
+
+        # Point scale
+        self.use_sigma = cfg.use_sigma if 'use_sigma' in cfg else True
+
+        # Dropout params
+        self.use_dropout = 'dropout' in cfg
+        self.dropout_frequency = cfg.dropout.frequency if 'dropout' in cfg else 2
+        self.dropout_stop_iter = cfg.dropout.stop_iter if 'dropout' in cfg else float("inf")
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        in_points = x[self.in_points_field]
+
+        if self.save_points_field is not None:
+            x[self.save_points_field] = in_points
+
+        # Get point scale
+        if self.use_sigma and self.in_density_field in x:
+            sigma = x[self.in_density_field]
+        else:
+            sigma = torch.zeros(in_points.shape[0], in_points.shape[1], 1, device=in_points.device)
+
+        point_scale = x[self.in_scale_field] * (1 - sigma)
+
+        # Dropout
+        if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) and self.cur_iter < self.dropout_stop_iter and self.training:
+            point_scale = torch.ones_like(point_scale)
+
+        # Apply scale
+        x[self.in_scale_field] = point_scale
+        x[self.out_points_field] = x[self.in_points_field] * (point_scale + 1.0)
+
+        if self.out_scale_field is not None:
+            x[self.out_scale_field] = point_scale
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class PointTransformEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # In & out fields
+        self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'point_sigma'
+
+        self.in_transform_field = cfg.in_transform_field if 'in_transform_field' in cfg else 'point_transform'
+        self.out_transform_field = cfg.out_transform_field if 'out_transform_field' in cfg else self.in_transform_field
+
+        self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
+        self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else self.in_points_field
+        self.save_points_field = cfg.save_points_field if 'save_points_field' in cfg else None
+
+        # Point transform
+        self.use_sigma = cfg.use_sigma if 'use_sigma' in cfg else True
+
+        # Dropout params
+        self.use_dropout = 'dropout' in cfg
+        self.dropout_frequency = cfg.dropout.frequency if 'dropout' in cfg else 2
+        self.dropout_stop_iter = cfg.dropout.stop_iter if 'dropout' in cfg else float("inf")
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        in_points = x[self.in_points_field]
+
+        if self.save_points_field is not None:
+            x[self.save_points_field] = in_points
+
+        # Get point transform
+        if self.use_sigma and self.in_density_field in x:
+            sigma = x[self.in_density_field]
+        else:
+            sigma = torch.zeros(in_points.shape[0], in_points.shape[1], 1, device=in_points.device)
+
+        point_transform = x[self.in_transform_field] * (1 - sigma)
+
+        # Dropout
+        if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) and self.cur_iter < self.dropout_stop_iter and self.training:
+            point_transform = torch.ones_like(point_transform)
+
+        # Apply transform
+        x[self.in_transform_field] = point_transform
+
+        point_transform = point_transform.view(in_points.shape[0], -1, 3, 3)
+        x[self.out_points_field] = torch.stack(
+            [
+                in_points[..., 0] + dot(in_points, point_transform[..., 0, :]),
+                in_points[..., 1] + dot(in_points, point_transform[..., 1, :]),
+                in_points[..., 2] + dot(in_points, point_transform[..., 2, :]),
+            ],
+            -1
+        )
+
+        if self.out_transform_field is not None:
+            x[self.out_transform_field] = point_transform
 
         return x
 
@@ -1032,6 +1174,8 @@ point_embedding_dict = {
     'create_points': CreatePointsEmbedding,
     'point_density': PointDensityEmbedding,
     'point_offset': PointOffsetEmbedding,
+    'point_scale': PointScaleEmbedding,
+    'point_transform': PointTransformEmbedding,
     'damp_field': DampFieldEmbedding,
     'epipolar_offset': EpipolarOffsetEmbedding,
     'generate_samples': GenerateNumSamplesEmbedding,

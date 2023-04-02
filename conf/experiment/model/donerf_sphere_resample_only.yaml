@@ -37,21 +37,27 @@ embedding:
             type: basic
             n_freqs: 2
 
-        dirs:
-          start: 3
+        ray: # TODO: Maybe remove
+          start: 0
           end: 6
 
           param:
-            n_dims: 3
-            fn: identity
+            n_dims: 6
+            fn: pluecker
+            direction_multiplier: 1.0
+            moment_multiplier: 1.0
 
           pe:
-            type: basic
+            type: windowed
+            freq_multiplier: 2.0
             n_freqs: 1
+            wait_iters: 0
+            max_freq_epoch: 0
+            exclude_identity: False
 
       # Net
       net:
-        type: zero # NOTE: New
+        type: base
 
         group: embedding_impl
 
@@ -65,6 +71,9 @@ embedding:
       outputs:
         z_vals:
           channels: 4
+
+          activation:
+            type: zero
 
         sigma:
           channels: 1
@@ -86,7 +95,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
-            wait_epochs: 1
+            wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -96,8 +105,40 @@ embedding:
           channels: 3
 
           activation:
-            type: tanh
-            outer_fac: 0.125
+            type: zero
+
+      ray_outputs: # TODO: Remove
+        color_scale:
+        #color_scale_global:
+          channels: 3
+
+          activation:
+            type: ease_in_value
+            start_value: 0.0
+            window_epochs: 0
+            wait_epochs: 0
+
+            activation:
+              type: identity
+              shift: 0.0
+              inner_fac: 1.0
+              outer_fac: 1.0
+
+        color_shift:
+        #color_shift_global:
+          channels: 3
+
+          activation:
+            type: ease_in_value
+            start_value: 0.0
+            window_epochs: 0
+            wait_epochs: 0
+
+            activation:
+              type: identity
+              shift: 0.0
+              inner_fac: 1.0
+              outer_fac: 1.0
 
     
     # NOTE: New
@@ -121,9 +162,7 @@ embedding:
         type: sphere
 
         sort: True
-        outward_facing: False
-        use_disparity: False
-        max_axis: False
+        sort_outputs: [point_sigma, point_offset, color_scale, color_shift]
 
         residual_z: True # NOTE: New
         round_centers: False # NOTE: New
@@ -149,69 +188,13 @@ embedding:
           type: identity
           fac: 0.5
 
-        z_scale: 0.125
-
-    point_prediction_0:
-      type: point_prediction
-
-      # Inputs
-      in_z_channels: 32
-
-      inputs:
-        points: 3
-
-      # Parameterization
-      params:
-        ray:
-          start: 0
-          end: 3
-
-          param:
-            n_dims: 3
-            fn: identity
-
-          pe:
-            type: basic
-            n_freqs: 2
-
-      net:
-        type: fast_net
-        opt_group: embedding_impl_large
-
-        otype: FullyFusedMLP
-
-        depth: 6
-        hidden_channels: 128
-
-      # Outputs
-      out_z_channels: 32
-
-      outputs:
-        point_offset_3d:
-          channels: 3
-
-          activation:
-            type: ease_in_value
-            start_value: 0.0
-            window_epochs: 0
-            wait_epochs: 0
-
-            activation:
-              type: tanh
-              outer_fac: 0.25
-
-    point_offset_1:
-      type: point_offset
-      in_offset_field: point_offset_3d
-      use_sigma: False
-
     add_point_outputs_0:
       type: add_point_outputs
       extra_outputs: ['viewdirs']
 
     extract_fields:
       type: extract_fields
-      fields: ['points', 'distances', 'viewdirs', 'weights']
+      fields: ['points', 'distances', 'viewdirs', 'weights', 'color_scale', 'color_shift']
 
 
 ### COLOR ###

@@ -37,17 +37,35 @@ embedding:
             type: basic
             n_freqs: 2
 
-        dirs:
-          start: 3
+        #dirs:
+        #  start: 3
+        #  end: 6
+
+        #  param:
+        #    n_dims: 3
+        #    fn: identity
+
+        #  pe:
+        #    type: basic
+        #    n_freqs: 1
+
+        ray: # TODO: Maybe remove
+          start: 0
           end: 6
 
           param:
-            n_dims: 3
-            fn: identity
+            n_dims: 6
+            fn: pluecker
+            direction_multiplier: 1.0
+            moment_multiplier: 1.0
 
           pe:
-            type: basic
+            type: windowed
+            freq_multiplier: 2.0
             n_freqs: 1
+            wait_iters: 0
+            max_freq_epoch: 0
+            exclude_identity: False
 
       # Net
       net:
@@ -85,7 +103,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
-            wait_epochs: 1
+            wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -98,7 +116,9 @@ embedding:
             type: tanh
             outer_fac: 0.125
 
+      ray_outputs: # TODO: Remove
         color_scale:
+        #color_scale_global:
           channels: 3
 
           activation:
@@ -114,6 +134,7 @@ embedding:
               outer_fac: 1.0
 
         color_shift:
+        #color_shift_global:
           channels: 3
 
           activation:
@@ -138,9 +159,7 @@ embedding:
         type: sphere
 
         sort: True
-        outward_facing: False
-        use_disparity: False
-        max_axis: False
+        sort_outputs: [point_sigma, point_offset, color_scale, color_shift]
 
         use_sigma: True
 
@@ -155,78 +174,20 @@ embedding:
           contract_samples: True
           use_dataset_bounds: True
 
+        #z_scale: 0.125
+
+        #activation:
+        #  type: identity
+        #  fac: 0.5
+
         activation:
-          type: identity
-          fac: 0.5
+          type: tanh
+          inner_fac: 0.25
+          outer_fac: 4.0
 
-        z_scale: 0.125
-
-    epipolar_offset_0:
-      type: epipolar_offset
-
-      window:
-        window_epochs: 5
-        wait_epochs: 5
-
-    point_offset_0:
-      type: point_offset
-      use_sigma: True
-
-    point_prediction_0:
-      type: point_prediction
-
-      # Inputs
-      in_z_channels: 32
-
-      inputs:
-        points: 3
-
-      # Parameterization
-      params:
-        ray:
-          start: 0
-          end: 3
-
-          param:
-            n_dims: 3
-            fn: identity
-
-          # NOTE: New
-          pe:
-            type: basic
-            n_freqs: 2
-
-      # NOTE: New
-      net:
-        type: fast_net
-        opt_group: embedding_impl_large
-
-        otype: FullyFusedMLP
-
-        depth: 6
-        hidden_channels: 128
-
-      # Outputs
-      out_z_channels: 32
-
-      outputs:
-        point_offset_3d:
-          channels: 3
-
-          activation:
-            type: ease_in_value
-            start_value: 0.0
-            window_epochs: 0
-            wait_epochs: 0
-
-            activation:
-              type: tanh
-              outer_fac: 0.25
-
-    point_offset_1:
-      type: point_offset
-      in_offset_field: point_offset_3d
-      use_sigma: False
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs
@@ -257,8 +218,8 @@ color:
     aabb: [[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]]
 
     # Grid size and upsampling
-    #N_voxel_init: 3375000
-    N_voxel_init: 512000
+    N_voxel_init: 3375000
+    #N_voxel_init: 512000
     N_voxel_final: 216000000
 
     upsamp_list: [4000,6000,8000,10000,12000]

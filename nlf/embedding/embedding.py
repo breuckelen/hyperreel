@@ -111,7 +111,7 @@ class RayPointEmbedding(nn.Module):
 
         # Flatten
         for key in x.keys():
-            x[key] = x[key].view(rays.shape[0], -1)
+            x[key] = x[key].reshape(rays.shape[0], -1)
 
         # Return
         return x

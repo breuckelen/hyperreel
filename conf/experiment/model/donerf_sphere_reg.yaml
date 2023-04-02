@@ -20,40 +20,27 @@ embedding:
 
       # Parameterization
       params:
-        points:
+        ray:
           start: 0
-          end: 7
-
-          param:
-            n_dims: 3
-            fn: depth
-
-            contract:
-              type: mipnerf
-              contract_samples: True
-              use_dataset_bounds: True
-
-          pe:
-            type: basic
-            n_freqs: 2
-
-        dirs:
-          start: 3
           end: 6
 
           param:
-            n_dims: 3
-            fn: identity
+            n_dims: 6
+            fn: pluecker
+            direction_multiplier: 1.0
+            moment_multiplier: 1.0
 
           pe:
-            type: basic
+            type: windowed
+            freq_multiplier: 2.0
             n_freqs: 1
+            wait_iters: 0
+            max_freq_epoch: 0
+            exclude_identity: False
 
       # Net
       net:
         type: base
-        #type: zero # NOTE: New
-
         group: embedding_impl
 
         depth: 6
@@ -87,7 +74,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
-            wait_epochs: 1
+            wait_epochs: 0
 
             activation:
               type: sigmoid
@@ -96,11 +83,36 @@ embedding:
         point_offset:
           channels: 3
 
-          activation:
-            type: tanh
-            outer_fac: 0.125
+          #activation:
+          #  type: tanh
+          #  outer_fac: 0.125
 
+          activation:
+            type: ease_out_value
+            end_value: 0.0
+            window_epochs: 5
+            wait_epochs: 5
+
+            activation:
+              type: tanh
+              outer_fac: 0.125
+
+          #activation:
+          #  type: interp_value
+          #  window_epochs: 5
+          #  wait_epochs: 5
+
+          #  act1:
+          #    type: tanh
+          #    outer_fac: 0.125
+
+          #  act2:
+          #    type: tanh
+          #    outer_fac: 0.125
+
+      ray_outputs: # TODO: Remove
         color_scale:
+        #color_scale_global:
           channels: 3
 
           activation:
@@ -116,6 +128,7 @@ embedding:
               outer_fac: 1.0
 
         color_shift:
+        #color_shift_global:
           channels: 3
 
           activation:
@@ -129,17 +142,6 @@ embedding:
               shift: 0.0
               inner_fac: 1.0
               outer_fac: 1.0
-    
-    # NOTE: New
-    copy_fields_0:
-      type: add_fields
-
-      fields:
-        rays:
-          start: 6
-          end: 7
-        
-      out_field: last_distance
 
     ray_intersect_0:
       type: ray_intersect
@@ -151,22 +153,9 @@ embedding:
         type: sphere
 
         sort: True
-        outward_facing: False
-        use_disparity: False
-        max_axis: False
+        sort_outputs: [point_sigma, point_offset, color_scale, color_shift]
 
-        residual_z: True # NOTE: New
-        round_centers: False # NOTE: New
-
-        #initial: -10.0 # NOTE: New
-        #end: 10.0 # NOTE: New
-        initial: -1.0 # NOTE: New
-        end: 1.0 # NOTE: New
-        #initial: -1.0 # NOTE: New
-        #end: 1.0 # NOTE: New
-        #initial: -0.0 # NOTE: New
-        #end: 0.0 # NOTE: New
-
+        generate_offsets: True
         use_sigma: True
 
         out_points: raw_points
@@ -180,18 +169,16 @@ embedding:
           contract_samples: True
           use_dataset_bounds: True
 
+        #z_scale: 0.125
+
+        #activation:
+        #  type: identity
+        #  fac: 0.5
+
         activation:
-          type: identity
-          fac: 0.5
-
-        z_scale: 0.125
-
-    #epipolar_offset_0:
-    #  type: epipolar_offset
-
-    #  window:
-    #    window_epochs: 5
-    #    wait_epochs: 5
+          type: tanh
+          inner_fac: 0.25
+          outer_fac: 4.0
 
     #point_offset_0:
     #  type: point_offset
@@ -216,10 +203,12 @@ embedding:
             n_dims: 3
             fn: identity
 
+          # NOTE: New
           pe:
             type: basic
             n_freqs: 2
 
+      # NOTE: New
       net:
         type: fast_net
         opt_group: embedding_impl_large
@@ -239,12 +228,12 @@ embedding:
           activation:
             type: ease_in_value
             start_value: 0.0
-            window_epochs: 0
-            wait_epochs: 0
+            window_epochs: 1
+            wait_epochs: 5
 
             activation:
               type: tanh
-              outer_fac: 0.25
+              outer_fac: 0.125
 
     point_offset_1:
       type: point_offset
@@ -267,9 +256,6 @@ color:
   net:
     type: tensor_vm_split_no_sample
 
-    constant_distance: True # NOTE: New
-    #constant_distance: False # NOTE: New
-
     # Scene hyper-params
     white_bg: 0
     black_bg: 0
@@ -283,15 +269,15 @@ color:
     aabb: [[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]]
 
     # Grid size and upsampling
-    #N_voxel_init: 3375000
-    N_voxel_init: 512000
+    N_voxel_init: 3375000
+    #N_voxel_init: 512000
     N_voxel_final: 216000000
 
     upsamp_list: [4000,6000,8000,10000,12000]
     lr_upsample_reset: True
 
     # Thresholding
-    update_AlphaMask_list: []
+    update_AlphaMask_list: [4000,8000]
     rm_weight_mask_thre: 0
     alpha_mask_thre: 1e-3
 
@@ -302,6 +288,7 @@ color:
     ## Shading
     shadingMode: RGB
     data_dim_color: 3
+
 
 
 

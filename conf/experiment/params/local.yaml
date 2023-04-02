@@ -21,7 +21,7 @@ render_only: False
 load_from_weights: False
 start_epoch: 0
 
-seed: 1
+#seed: 1
 
 save_video_dir: "val_videos"
 save_image_dir: "val_images"

@@ -10,8 +10,9 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=refnerf_large \
     experiment.training.ckpt_every=10 \
     experiment.training.test_every=20 \
     experiment.training.render_every=50 \
-    experiment/model=refnerf_sphere \
+    experiment/model=refnerf_$3 \
     experiment.params.print_loss=True \
     experiment.dataset.collection=$2 \
-    +experiment/regularizers/tensorf=tv_4000_large
+    +experiment/regularizers/tensorf=tv_4000 \
+    +experiment/visualizers/embedding=default
 
