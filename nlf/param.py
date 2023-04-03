@@ -290,6 +290,45 @@ class DepthParam(nn.Module):
         self.cur_iter = i
 
 
+class DepthLayeredParam(nn.Module):
+    def __init__(
+        self,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.in_channels = cfg.in_channels if 'in_channels' in cfg else 8
+        self.out_channels = cfg.n_dims if 'n_dims' in cfg else 6
+
+        self.origin = torch.tensor(cfg.origin if 'origin' in cfg else [0.0, 0.0, 0.0], device='cuda')
+
+        if 'contract' in cfg:
+            self.contract_fn = contract_dict[cfg.contract.type](
+                cfg.contract,
+                **kwargs
+            )
+        else:
+            self.contract_fn = contract_dict['identity']({})
+
+    def forward(self, rays):
+        rays_o, rays_d = rays[..., :3] - self.origin.unsqueeze(0), rays[..., 3:6]
+
+        depth_min = rays[..., 6:7]
+        depth_max = rays[..., 7:8]
+
+        points_min = rays_o + depth_min * rays_d
+        points_min = self.contract_fn.contract_points(points_min)
+
+        points_max = rays_o + depth_max * rays_d
+        points_max = self.contract_fn.contract_points(points_max)
+
+        return torch.cat([points_min, points_max], -1)
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
 class ContractPointsParam(nn.Module):
     def __init__(
         self,
@@ -486,6 +525,7 @@ ray_param_dict = {
     'z_slice': ZSliceParam,
     'contract_points': ContractPointsParam,
     'depth': DepthParam,
+    'depth_layered': DepthLayeredParam,
 }
 
 

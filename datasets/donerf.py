@@ -46,6 +46,7 @@ class DONeRFDataset(Base5DDataset):
         self.use_ndc = cfg.dataset.use_ndc if 'use_ndc' in cfg.dataset else False
         self.train_skip = cfg.dataset.train_skip if 'train_skip' in cfg.dataset else 1
         self.depth_downsample = cfg.dataset.depth_downsample if 'depth_downsample' in cfg.dataset else None
+        self.layered_depth = cfg.dataset.layered_depth if 'layered_depth' in cfg.dataset else False
 
         super().__init__(cfg, split, **kwargs)
 
@@ -186,7 +187,10 @@ class DONeRFDataset(Base5DDataset):
         )
 
         # Calculate bounds
-        mask = (self.all_depth != 0.0)
+        if self.layered_depth:
+            mask = (self.all_depth[..., -1:] != 0.0)
+        else:
+            mask = (self.all_depth != 0.0)
 
         self.bbox_min = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).min(0)[0]
         self.bbox_max = self.all_points[mask.repeat(1, 3)].reshape(-1, 3).max(0)[0]
@@ -218,7 +222,10 @@ class DONeRFDataset(Base5DDataset):
     def format_batch(self, batch):
         batch['coords'] = batch['inputs'][..., :self.all_coords.shape[-1]]
         batch['rgb'] = batch['inputs'][..., self.all_coords.shape[-1]:self.all_coords.shape[-1] + 3]
-        batch['depth'] = batch['inputs'][..., self.all_coords.shape[-1] + 3:self.all_coords.shape[-1] + 4]
+        if self.layered_depth:
+            batch['depth'] = batch['inputs'][..., self.all_coords.shape[-1] + 3:self.all_coords.shape[-1] + 5]
+        else:
+            batch['depth'] = batch['inputs'][..., self.all_coords.shape[-1] + 3:self.all_coords.shape[-1] + 4]
         batch['weight'] = batch['inputs'][..., -1:]
         del batch['inputs']
 
@@ -270,7 +277,10 @@ class DONeRFDataset(Base5DDataset):
         image_path = os.path.join(self.root_dir, f'{image_path}_depth.npz')
 
         if not self.pmgr.exists(image_path):
-            return torch.zeros_like(self.directions.view(-1, 3)[..., 0:1])
+            if self.layered_depth:
+                return torch.zeros_like(self.directions.view(-1, 3)[..., 0:2])
+            else:
+                return torch.zeros_like(self.directions.view(-1, 3)[..., 0:1])
 
         with self.pmgr.open(
             image_path,
@@ -285,9 +295,14 @@ class DONeRFDataset(Base5DDataset):
             depth = cv2.resize(depth, img_wh, interpolation=cv2.INTER_NEAREST)
             depth[depth < self.near] = self.near
             depth[depth > self.far] = self.far
-            depth = cv2.resize(depth, self.img_wh, interpolation=cv2.INTER_NEAREST)
-        else:
-            depth = cv2.resize(depth, self._img_wh, interpolation=cv2.INTER_NEAREST)
+        
+        if self.layered_depth:
+            kernel = np.ones((5,5),np.uint8)
+            depth_min = cv2.erode(depth, kernel)
+            depth_max = cv2.dilate(depth, kernel)
+            depth = np.stack([depth_min, depth_max], axis=-1)
+
+        depth = cv2.resize(depth, self._img_wh, interpolation=cv2.INTER_NEAREST)
 
         if self.img_wh[0] != self._img_wh[0] or self.img_wh[1] != self._img_wh[1]:
             depth = cv2.resize(depth, self.img_wh, interpolation=cv2.INTER_NEAREST)
@@ -296,22 +311,33 @@ class DONeRFDataset(Base5DDataset):
         depth = np.flip(depth, 0)
 
         # Depth to distance
-        depth = depth * np.array(torch.linalg.norm(self.directions, dim=-1))
+        if self.layered_depth:
+            depth = depth * np.array(torch.linalg.norm(self.directions, dim=-1))[..., None]
+        else:
+            depth = depth * np.array(torch.linalg.norm(self.directions, dim=-1))
 
         # Change zero values
         depth[depth < self.near] = self.near
         depth[depth > self.far] = self.far
 
         # Transform
-        depth = self.transform(np.copy(depth))
+        depth = self.transform(np.copy(depth)).permute(1, 2, 0)
 
         # Return
-        return depth.view(-1, 1)
+        if self.layered_depth:
+            return depth.view(-1, 2)
+        else:
+            return depth.view(-1, 1)
 
     def get_points(self, idx):
         rays = self.all_coords[idx][..., :6].reshape(-1, 6)
-        depth = self.all_depth[idx].reshape(-1, 1)
-        return rays[..., :3] + rays[..., 3:6] * depth
+
+        if self.layered_depth:
+            depth = self.all_depth[idx].reshape(-1, 2)[..., -1:]
+            return rays[..., :3] + rays[..., 3:6] * depth
+        else:
+            depth = self.all_depth[idx].reshape(-1, 1)
+            return rays[..., :3] + rays[..., 3:6] * depth
 
     def get_intrinsics(self):
         K = np.eye(3)

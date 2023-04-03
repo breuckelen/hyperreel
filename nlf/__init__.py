@@ -965,7 +965,12 @@ class INRSystem(LightningModule):
         all_images['eval/gt'] = img_gt
 
         if 'depth' in batch:
-            depth = batch['depth'].view(H, W).cpu().numpy()
+            depth = batch['depth']
+
+            if depth.shape[-1] > 1:
+                depth = depth[..., -1:]
+
+            depth = depth.view(H, W).cpu().numpy()
             all_images['eval/depth'] = depth / depth.max()
 
         # Helper for adding outputs

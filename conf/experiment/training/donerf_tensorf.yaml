@@ -100,8 +100,8 @@ optimizers:
     warmup_multiplier: 1.0
     warmup_epochs: 0
 
-    #decay_epoch: 50
-    decay_epoch: 20
+    decay_epoch: 50
+    #decay_epoch: 20
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]
@@ -118,8 +118,8 @@ optimizers:
     warmup_multiplier: 1.0
     warmup_epochs: 0
 
-    #decay_epoch: 50
-    decay_epoch: 20
+    decay_epoch: 50
+    #decay_epoch: 20
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]

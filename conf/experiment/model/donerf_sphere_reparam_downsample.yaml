@@ -116,7 +116,7 @@ embedding:
             type: tanh
             outer_fac: 0.125
 
-      #ray_outputs: # TODO: Maybe remove
+      ray_outputs: # TODO: Maybe remove
         color_scale:
         #color_scale_global:
           channels: 3
@@ -185,9 +185,9 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
-    point_offset_0:
-      type: point_offset
-      use_sigma: True
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs

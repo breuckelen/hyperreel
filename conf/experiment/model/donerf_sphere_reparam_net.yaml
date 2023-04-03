@@ -215,7 +215,7 @@ embedding:
       type: add_fields
 
       fields:
-        distances_no_contract:
+        distances:
           start: 0
           end: 1
         

@@ -20,7 +20,8 @@ from nlf.contract import contract_dict
 
 from nlf.activations import get_activation
 from utils.intersect_utils import (
-    sort_z
+    sort_z,
+    sort_with
 )
 from utils.flow_utils import (
     get_base_time
@@ -564,6 +565,100 @@ class PointTransformEmbedding(nn.Module):
 
         if self.out_transform_field is not None:
             x[self.out_transform_field] = point_transform
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class GenerateDistancesEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.in_origin_field = cfg.in_origin_field if 'in_origin_field' in cfg else 'origins'
+        self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
+        self.out_distance_field = cfg.out_distance_field if 'out_distance_field' in cfg else 'distances'
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        in_origin = x[self.in_origin_field]
+        in_points = x[self.in_points_field]
+
+        x[self.out_distance_field] = torch.norm(
+            in_points - in_origin[:, None, :],
+            dim=-1,
+            keepdim=True
+        )
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class GenerateDeltasEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
+        self.out_deltas_field = cfg.out_deltas_field if 'out_deltas_field' in cfg else 'deltas'
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        in_points = x[self.in_points_field]
+
+        x[self.out_deltas_field] = torch.cat(
+            [
+                torch.norm(in_points[..., 1:, :] - in_points[..., -1:, :], dim=-1, keepdim=True),
+                1e10 * torch.ones_like(in_points[:, :1, :1]),
+            ],
+            dim=1,
+        )
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
+class SortOutputsEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.in_distance_field = cfg.in_distance_field if 'in_distance_field' in cfg else 'distances'
+        self.sort_outputs = list(cfg.sort_outputs) if 'sort_outputs' in cfg else []
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        distances = x[self.in_distance_field].squeeze(-1)
+        distances, sort_idx = sort_z(distances)
+        x[self.in_distance_field] = distances.unsqueeze(-1)
+
+        for output_key in self.sort_outputs:
+            if output_key in x and len(x[output_key].shape) == 3:
+                x[output_key] = sort_with(sort_idx, x[output_key])
 
         return x
 
@@ -1176,6 +1271,9 @@ point_embedding_dict = {
     'point_offset': PointOffsetEmbedding,
     'point_scale': PointScaleEmbedding,
     'point_transform': PointTransformEmbedding,
+    'generate_distances': GenerateDistancesEmbedding,
+    'generate_deltas': GenerateDeltasEmbedding,
+    'sort_outputs': SortOutputsEmbedding,
     'damp_field': DampFieldEmbedding,
     'epipolar_offset': EpipolarOffsetEmbedding,
     'generate_samples': GenerateNumSamplesEmbedding,

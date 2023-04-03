@@ -66,8 +66,6 @@ class Intersect(nn.Module):
         # Input/output size
         self.z_channels = z_channels
         self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
-        self.out_points = cfg.out_points if 'out_points' in cfg else None
-        self.out_distance = cfg.out_distance if 'out_distance' in cfg else None
 
         # Other common parameters
         self.forward_facing = cfg.forward_facing if 'forward_facing' in cfg else False
@@ -254,30 +252,19 @@ class Intersect(nn.Module):
             points_fixed = rays[..., None, :3] + rays[..., None, 3:6] * dists_fixed
 
         # Contract
-        dists_no_contract = dists
-
         if not (self.cur_iter > self.contract_stop_iters):
-            points, dists = self.contract_fn.contract_points_and_distance(
-                rays[..., :3], points, dists
-            )
-            dists = torch.where(mask, torch.zeros_like(dists), dists)
+            points = self.contract_fn.contract_points(points)
+            origins = self.contract_fn.contract_points(rays[..., :3])
 
             if self.generate_offsets:
-                points_fixed, dists_fixed = self.contract_fn.contract_points_and_distance(
-                    rays[..., :3], points_fixed, dists_fixed
+                points_fixed = self.contract_fn.contract_points(
+                    points_fixed
                 )
-                dists_fixed = torch.where(mask, torch.zeros_like(dists_fixed), dists_fixed)
-        
-        if self.out_points is not None:
-            x[self.out_points] = points
-
-        if self.out_distance is not None:
-            x[self.out_distance] = dists
 
         # Return
         x['points'] = points
+        x['origins'] = origins
         x['distances'] = dists
-        x['distances_no_contract'] = dists_no_contract
         x['z_vals'] = z_vals
 
         if self.generate_offsets:

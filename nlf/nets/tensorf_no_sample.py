@@ -292,6 +292,7 @@ class TensorVMNoSample(TensorVMSplit):
 
         # Distances
         distances = x["distances"].view(batch_size, -1)
+
         deltas = torch.cat(
             [
                 distances[..., 1:] - distances[..., :-1],
@@ -299,6 +300,17 @@ class TensorVMNoSample(TensorVMSplit):
             ],
             dim=1,
         )
+
+        #if "deltas" in x:
+        #    deltas = x["deltas"].view(batch_size, -1)
+        #else:
+        #    deltas = torch.cat(
+        #        [
+        #            torch.norm(xyz_sampled[..., 1:, :] - xyz_sampled[..., -1:, :], dim=-1),
+        #            1e10 * torch.ones_like(distances[:, :1]),
+        #        ],
+        #        dim=1,
+        #    )
 
         if self.constant_distance:
             deltas = torch.ones_like(deltas) / deltas.shape[1]
