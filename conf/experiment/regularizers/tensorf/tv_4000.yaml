@@ -21,3 +21,5 @@ L1_weight_initial: 8e-5
 L1_weight_rest: 4e-5
 TV_weight_density: 0.05
 TV_weight_app: 0.05
+TV_weight_density_rest: 5e-3
+TV_weight_app_rest: 5e-3
