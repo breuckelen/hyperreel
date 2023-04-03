@@ -53,9 +53,9 @@ class TensoRF(BaseRegularizer):
 
         self.L1_reg_weight = self.cfg.L1_weight_initial
         self.TV_weight_density = self.cfg.TV_weight_density
-        self.TV_weight_density_rest = self.cfg.TV_weight_density if 'TV_weight_density_rest' in cfg else 0.0
+        self.TV_weight_density_rest = self.cfg.TV_weight_density_rest if 'TV_weight_density_rest' in cfg else 0.0
         self.TV_weight_app = self.cfg.TV_weight_app
-        self.TV_weight_app_rest = self.cfg.TV_weight_app if 'TV_weight_app_rest' in cfg else 0.0
+        self.TV_weight_app_rest = self.cfg.TV_weight_app_rest if 'TV_weight_app_rest' in cfg else 0.0
 
     def _loss(self, train_batch, batch_results, batch_idx):
         #### Prepare ####

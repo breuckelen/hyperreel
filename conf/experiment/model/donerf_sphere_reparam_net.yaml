@@ -261,6 +261,12 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
+    generate_distances_0:
+      type: generate_distances
+      in_origin_field: origins
+      in_points_field: points
+      out_distance_field: distances
+
     #point_offset_0:
     #  type: point_offset
     #  use_sigma: True
@@ -270,11 +276,11 @@ embedding:
     #  in_distance_field: distances
     #  sort_outputs: [points, point_sigma, point_offset, color_scale, color_shift]
 
-    generate_distances_0:
-      type: generate_distances
-      in_origin_field: origins
-      in_points_field: points
-      out_distance_field: distances
+    #generate_distances_0:
+    #  type: generate_distances
+    #  in_origin_field: origins
+    #  in_points_field: points
+    #  out_distance_field: distances
 
     point_prediction_1:
       type: point_prediction
