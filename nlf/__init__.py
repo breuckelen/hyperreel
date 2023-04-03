@@ -1048,7 +1048,7 @@ class INRSystem(LightningModule):
         self.render_fn.eval()
 
         with torch.no_grad():
-            train_iter = self.get_train_iter(self.current_epoch + 1, 0, True)
+            train_iter = self.get_train_iter(self.current_epoch + 1, -1, True)
             self.set_train_iter(max(train_iter, 0))
 
             # Interact
