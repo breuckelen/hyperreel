@@ -153,11 +153,14 @@ class Intersect(nn.Module):
         else:
             sigma = torch.zeros(z_vals.shape[0], z_vals.shape[1], device=z_vals.device)
 
-        z_vals = self.activation(z_vals.view(z_vals.shape[0], sigma.shape[1], -1)) * (1 - sigma.unsqueeze(-1))
+        z_vals = self.activation(
+            z_vals.view(z_vals.shape[0], sigma.shape[1], -1)
+        ) * (1 - sigma.unsqueeze(-1))
         z_vals = z_vals.view(z_vals.shape[0], -1)
 
         # Apply offset
-        if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) and self.cur_iter < self.dropout_stop_iter and self.training:
+        if self.use_dropout and ((self.cur_iter % self.dropout_frequency) == 0) \
+            and self.cur_iter < self.dropout_stop_iter and self.training:
             z_vals = torch.zeros_like(z_vals)
 
         #print(torch.abs(z_vals).mean()) # TODO: Remove
@@ -177,7 +180,9 @@ class Intersect(nn.Module):
                 last_z = self.distance_to_z(rays, last_distance)
                 #print(last_z[0])
 
-            z_vals = z_vals.view(z_vals.shape[0], last_z.shape[1], -1, last_z.shape[-1]) + last_z.unsqueeze(2)
+            z_vals = z_vals.view(
+                z_vals.shape[0], last_z.shape[1], -1, last_z.shape[-1]
+            ) + last_z.unsqueeze(2)
             z_vals = z_vals.view(z_vals.shape[0], -1)
 
         # Get distances

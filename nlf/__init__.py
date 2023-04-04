@@ -702,9 +702,7 @@ class INRSystem(LightningModule):
             reg.batch_size = self.trainer.datamodule.cur_batch_size
             cur_loss = reg.loss(batch, results, batch_idx) * reg.loss_weight()
             reg_loss += cur_loss
-
-            cur_mult = reg.loss_mult()
-            loss *= cur_mult
+            loss *= reg.loss_mult()
         
         loss += reg_loss
 
