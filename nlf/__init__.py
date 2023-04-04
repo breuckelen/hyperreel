@@ -612,13 +612,14 @@ class INRSystem(LightningModule):
 
         return train_iter
 
-    def set_train_iter(self, train_iter):
+    def set_train_iter(self, train_iter, set_regularizers=True):
         # Set model iter
         self.render_fn.model.set_iter(train_iter)
 
         # Set regularizer iter
-        for reg in self.regularizers:
-            reg.set_iter(train_iter)
+        if set_regularizers:
+            for reg in self.regularizers:
+                reg.set_iter(train_iter)
 
     @property
     def regularizer_render_kwargs(self):
@@ -664,7 +665,7 @@ class INRSystem(LightningModule):
 
         ## Tell model what training iter it is
         train_iter = self.get_train_iter(self.current_epoch, batch_idx)
-        self.set_train_iter(train_iter)
+        self.set_train_iter(train_iter, set_regularizers=True)
 
         # Reset optimizers if necessary
         if self.needs_opt_reset(train_iter):
@@ -1050,8 +1051,8 @@ class INRSystem(LightningModule):
         self.render_fn.eval()
 
         with torch.no_grad():
-            train_iter = self.get_train_iter(self.current_epoch + 1, -1, True)
-            self.set_train_iter(max(train_iter, 0))
+            train_iter = self.get_train_iter(self.current_epoch + 1, 0, True)
+            self.set_train_iter(max(train_iter, 0), set_regularizers=False)
 
             # Interact
             if self.interact_only:
