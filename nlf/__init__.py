@@ -268,8 +268,8 @@ class INRDataModule(LightningDataModule):
         return DataLoader(
             dataset,
             shuffle=False,
-            num_workers=self.cfg.training.num_workers,
-            persistent_workers=True,
+            num_workers=0,
+            persistent_workers=False,
             batch_size=1,
             pin_memory=True
         )

@@ -7,6 +7,7 @@
 import os
 import random
 import torch
+import torch.multiprocessing as multiprocessing
 import numpy as np
 from uuid import uuid4
 from typing import Dict
@@ -212,4 +213,5 @@ def main(cfg: DictConfig):
 
 
 if __name__ == '__main__':
+    multiprocessing.set_start_method('forkserver')
     main()
