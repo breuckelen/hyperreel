@@ -11,15 +11,22 @@ weight:
   num_epochs: 100
 
 update_AlphaMask_list: [4000,8000]
+
 lr_decay_target_ratio: 0.1
 n_iters: 30000
+
+total_num_tv_iters: 120000
 #total_num_tv_iters: 60000
 
 lr_upsample_reset: True
 
-L1_weight_initial: 8e-5
+L1_weight_initial: 4e-5
+#L1_weight_initial: 8e-5
+
 L1_weight_rest: 4e-5
+
 TV_weight_density: 0.05
 TV_weight_app: 0.05
-TV_weight_density_rest: 5e-3
-TV_weight_app_rest: 5e-3
+
+#TV_weight_density_rest: 5e-3
+#TV_weight_app_rest: 5e-3
