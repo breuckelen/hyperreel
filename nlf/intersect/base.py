@@ -252,9 +252,19 @@ class Intersect(nn.Module):
             points_fixed = rays[..., None, :3] + rays[..., None, 3:6] * dists_fixed
 
         # Contract
+        dists_no_contract = dists
+
         if not (self.cur_iter > self.contract_stop_iters):
-            points = self.contract_fn.contract_points(points)
-            origins = self.contract_fn.contract_points(rays[..., :3])
+            points, dists, origins = self.contract_fn.contract_points_and_distance(
+                rays[..., :3],
+                points,
+                dists_no_contract
+            )
+            dists_no_contract = torch.where(
+                mask,
+                torch.zeros_like(dists_no_contract),
+                dists_no_contract
+            )
 
             if self.generate_offsets:
                 points_fixed = self.contract_fn.contract_points(
@@ -265,6 +275,7 @@ class Intersect(nn.Module):
         x['points'] = points
         x['origins'] = origins
         x['distances'] = dists
+        x['distances_no_contract'] = dists_no_contract
         x['z_vals'] = z_vals
 
         if self.generate_offsets:

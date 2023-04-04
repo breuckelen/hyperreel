@@ -215,7 +215,7 @@ embedding:
       type: add_fields
 
       fields:
-        distances:
+        distances_no_contract:
           start: 0
           end: 1
         
@@ -260,12 +260,6 @@ embedding:
           type: tanh
           inner_fac: 0.25
           outer_fac: 4.0
-
-    generate_distances_0:
-      type: generate_distances
-      in_origin_field: origins
-      in_points_field: points
-      out_distance_field: distances
 
     #point_offset_0:
     #  type: point_offset

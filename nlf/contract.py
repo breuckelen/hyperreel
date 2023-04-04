@@ -47,7 +47,7 @@ class BaseContract(nn.Module):
         distance = torch.norm(points - rays_o[..., None, :], dim=-1, keepdim=True)
 
         # Return
-        return points, distance
+        return points, distance, rays_o
 
 
 class IdentityContract(BaseContract):
