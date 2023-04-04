@@ -83,10 +83,6 @@ embedding:
         point_offset:
           channels: 3
 
-          #activation:
-          #  type: tanh
-          #  outer_fac: 0.125
-
           activation:
             type: ease_out_value
             end_value: 0.0
@@ -96,19 +92,6 @@ embedding:
             activation:
               type: tanh
               outer_fac: 0.125
-
-          #activation:
-          #  type: interp_value
-          #  window_epochs: 5
-          #  wait_epochs: 5
-
-          #  act1:
-          #    type: tanh
-          #    outer_fac: 0.125
-
-          #  act2:
-          #    type: tanh
-          #    outer_fac: 0.125
 
       ray_outputs: # TODO: Remove
         color_scale:
@@ -180,9 +163,15 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
-    #point_offset_0:
-    #  type: point_offset
-    #  use_sigma: True
+    generate_distances_0:
+      type: generate_distances
+      in_origin_field: origins
+      in_points_field: points
+      out_distance_field: distances
+
+    point_offset_0:
+      type: point_offset
+      use_sigma: True
 
     point_prediction_0:
       type: point_prediction
@@ -222,23 +211,57 @@ embedding:
       out_z_channels: 32
 
       outputs:
+        point_sigma_3d:
+          channels: 1
+
+          activation:
+            type: ease_in_value
+            start_value: 1.0
+            window_epochs: 3
+            wait_epochs: 0
+
+            activation:
+              type: sigmoid
+              shift: 4.0
+
         point_offset_3d:
           channels: 3
 
           activation:
             type: ease_in_value
             start_value: 0.0
-            window_epochs: 1
-            wait_epochs: 5
+            window_epochs: 0
+            wait_epochs: 0
 
             activation:
               type: tanh
-              outer_fac: 0.125
+              outer_fac: 1.0
+
+        point_transform_3d:
+          channels: 9
+
+          activation:
+            type: ease_in_value
+            start_value: 0.0
+            window_epochs: 0
+            wait_epochs: 0
+
+            activation:
+              type: tanh
+              outer_fac: 1.0
 
     point_offset_1:
       type: point_offset
+      in_density_field: point_sigma_3d
       in_offset_field: point_offset_3d
-      use_sigma: False
+      use_sigma: True
+
+    point_transform_1:
+      type: point_transform
+      in_density_field: point_sigma_3d
+      in_transform_field: point_transform_3d
+      out_offset_field: point_offset_3d
+      use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs

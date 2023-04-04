@@ -12,6 +12,7 @@ from .geometry import (
     GeometryOverRegularizer,
     GeometryFeedbackRegularizer,
     OffsetFeedbackRegularizer,
+    OffsetSaveRegularizer,
     RenderWeightRegularizer
 )
 
@@ -37,6 +38,7 @@ regularizer_dict = {
     "geometry_over": GeometryOverRegularizer,
     "geometry_feedback": GeometryFeedbackRegularizer,
     "offset_feedback": OffsetFeedbackRegularizer,
+    "offset_save": OffsetSaveRegularizer,
     "flow": FlowRegularizer,
     "render_weight": RenderWeightRegularizer,
     "tensor_tv": TensorTV,

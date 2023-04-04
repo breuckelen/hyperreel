@@ -6,6 +6,7 @@
 
 import torch
 import torch.nn as nn
+import copy
 
 from .base import BaseRegularizer
 from nlf.contract import contract_dict
@@ -322,6 +323,88 @@ class OffsetFeedbackRegularizer(BaseRegularizer):
 
         return total_loss
 
+
+    @property
+    def render_kwargs(self):
+        return {
+            'fields': self.student_fields + self.teacher_fields + ['render_weights'],
+            'no_over_fields': self.student_fields + self.teacher_fields + ['render_weights'],
+        }
+
+
+class OffsetSaveRegularizer(BaseRegularizer):
+    def __init__(
+        self,
+        system,
+        cfg
+    ):
+        super().__init__(system, cfg)
+
+        # Setup losses
+        self.cfg = cfg
+
+        # Variables
+        self.student_fields = ["point_offset_3d", "point_offset_from_fixed"] 
+        self.teacher_fields = ["point_offset"]
+        self.sizes = list(cfg.sizes) if 'sizes' in cfg else [3 for s in self.student_fields]
+        self.weights = list(cfg.weights) if 'weights' in cfg else [1.0 for s in self.student_fields]
+
+    def _loss(self, batch, outputs, batch_idx):
+        system = self.get_system()
+
+        if self.cur_iter == 0:
+            self.models = [
+                copy.deepcopy(system.render_fn.model.embedding_model)
+            ]
+
+        # Get coords
+        rays = batch['coords']
+        rays = torch.clone(rays.view(-1, rays.shape[-1]))
+
+        # Get save outputs
+        embedding_model = self.models[0]
+        #print(embedding_model.embeddings[0].net.layers[0][0].weight)
+        #print(system.render_fn.model.embedding_model.embeddings[0].net.layers[0][0].weight)
+        save_outputs = embedding_model(rays, self.render_kwargs)
+
+        # Weights
+        render_weights = outputs['render_weights']
+        render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
+
+        # New offsets
+        student_points_1 = outputs[self.student_fields[0]]
+        student_points_1 = student_points_1.view(student_points_1.shape[0], -1, 1, self.sizes[-1])
+
+        student_points_2 = outputs[self.student_fields[1]]
+        student_points_2 = student_points_2.view(student_points_2.shape[0], -1, 1, self.sizes[-1])
+
+        # Old offsets
+        with torch.no_grad():
+            teacher_points = save_outputs[self.teacher_fields[0]]
+            teacher_points = teacher_points.view(teacher_points.shape[0], student_points_1.shape[1], -1, self.sizes[-1])
+
+            teacher_points_1 = save_outputs[self.student_fields[0]]
+            teacher_points_1 = teacher_points_1.view(teacher_points_1.shape[0], -1, 1, self.sizes[-1])
+
+            teacher_points_2 = save_outputs[self.student_fields[1]]
+            teacher_points_2 = teacher_points_2.view(teacher_points_2.shape[0], -1, 1, self.sizes[-1])
+
+        # Loss
+        render_weights = render_weights.detach()
+        render_weights = render_weights.view(render_weights.shape[0], student_points_1.shape[1], -1)
+
+        diff = torch.square(
+            (student_points_1 + student_points_2) \
+                - (teacher_points + teacher_points_1 + teacher_points_2)
+        ).sum(-1)
+
+        diff = (diff * render_weights).sum((-2, -1))
+        total_loss = torch.mean(diff) * self.weights[0]
+
+        return total_loss
+    
+    def loss_mult(self):
+        return 1.0
 
     @property
     def render_kwargs(self):

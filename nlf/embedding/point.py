@@ -519,6 +519,7 @@ class PointTransformEmbedding(nn.Module):
 
         self.in_transform_field = cfg.in_transform_field if 'in_transform_field' in cfg else 'point_transform'
         self.out_transform_field = cfg.out_transform_field if 'out_transform_field' in cfg else self.in_transform_field
+        self.out_offset_field = cfg.out_offset_field if 'out_offset_field' in cfg else 'point_offset'
 
         self.in_points_field = cfg.in_points_field if 'in_points_field' in cfg else 'points'
         self.out_points_field = cfg.out_points_field if 'out_points_field' in cfg else self.in_points_field
@@ -565,6 +566,9 @@ class PointTransformEmbedding(nn.Module):
 
         if self.out_transform_field is not None:
             x[self.out_transform_field] = point_transform
+
+        if self.out_offset_field is not None:
+            x[self.out_offset_field] += x[self.out_points_field] - in_points
 
         return x
 

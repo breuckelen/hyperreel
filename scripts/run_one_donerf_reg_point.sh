@@ -5,7 +5,7 @@
 # LICENSE file in the root directory of this source tree.
 
 CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=donerf_large \
-    experiment/training=donerf_tensorf \
+    experiment/training=donerf_tensorf_reg \
     experiment.training.val_every=5 \
     experiment.training.ckpt_every=20 \
     experiment.training.render_every=10 \

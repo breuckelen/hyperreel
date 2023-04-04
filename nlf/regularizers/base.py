@@ -151,6 +151,9 @@ class BaseRegularizer(nn.Module):
 
         return self._loss(batch, batch_results, batch_idx)
 
+    def loss_mult(self):
+        return 1.0
+
     def loss_weight(self):
         system = self.get_system()
 

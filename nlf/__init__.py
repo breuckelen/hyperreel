@@ -702,8 +702,10 @@ class INRSystem(LightningModule):
             cur_loss = reg.loss(batch, results, batch_idx) * reg.loss_weight()
             reg_loss += cur_loss
 
-            if not reg.warming_up():
-                loss += cur_loss
+            cur_mult = reg.loss_mult()
+            loss *= cur_mult
+        
+        loss += reg_loss
 
         # Print
         if self.cfg.params.print_loss and reg_loss > 0.0:
