@@ -1,10 +1,10 @@
 # @package _group_
 
-type: offset_save
+type: offset_feedback
 ray_chunk: 32768
 batch_size: 8192
 wait_epochs: 5
-stop_epochs: 5
+#stop_epochs: 2
 
 weight:
   type: exponential_decay

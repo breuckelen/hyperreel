@@ -296,6 +296,7 @@ class OffsetFeedbackRegularizer(BaseRegularizer):
         # Weights
         render_weights = outputs['render_weights']
         render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
+        #render_weights = torch.ones_like(render_weights)
 
         # 3D Point Offsets
         student_points_1 = outputs[self.student_fields[0]]
@@ -316,7 +317,8 @@ class OffsetFeedbackRegularizer(BaseRegularizer):
             (student_points_1 + student_points_2) \
                 - (teacher_points + student_points_1.clone().detach() + student_points_2.clone().detach())
         ).sum(-1)
-        diff = diff + torch.abs(teacher_points).sum(-1)
+        diff = diff + torch.square(teacher_points).sum(-1)
+        print(diff.max())
 
         diff = (diff * render_weights).sum((-2, -1))
         total_loss = torch.mean(diff) * self.weights[0]
@@ -369,9 +371,13 @@ class OffsetSaveRegularizer(BaseRegularizer):
 
         # Weights
         render_weights = outputs['render_weights']
-        render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
+        #render_weights = torch.ones_like(render_weights) / render_weights.shape[-1]
+        render_weights = torch.ones_like(render_weights)
 
         # New offsets
+        student_points = outputs[self.teacher_fields[0]]
+        student_points = student_points.view(student_points.shape[0], -1, 1, self.sizes[-1])
+
         student_points_1 = outputs[self.student_fields[0]]
         student_points_1 = student_points_1.view(student_points_1.shape[0], -1, 1, self.sizes[-1])
 
@@ -381,7 +387,7 @@ class OffsetSaveRegularizer(BaseRegularizer):
         # Old offsets
         with torch.no_grad():
             teacher_points = save_outputs[self.teacher_fields[0]]
-            teacher_points = teacher_points.view(teacher_points.shape[0], student_points_1.shape[1], -1, self.sizes[-1])
+            teacher_points = teacher_points.view(teacher_points.shape[0], -1, 1, self.sizes[-1])
 
             teacher_points_1 = save_outputs[self.student_fields[0]]
             teacher_points_1 = teacher_points_1.view(teacher_points_1.shape[0], -1, 1, self.sizes[-1])
@@ -397,6 +403,7 @@ class OffsetSaveRegularizer(BaseRegularizer):
             (student_points_1 + student_points_2) \
                 - (teacher_points + teacher_points_1 + teacher_points_2)
         ).sum(-1)
+        diff = diff + torch.square(student_points).sum(-1)
 
         diff = (diff * render_weights).sum((-2, -1))
         total_loss = torch.mean(diff) * self.weights[0]

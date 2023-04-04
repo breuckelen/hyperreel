@@ -61,6 +61,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
+            #window_epochs: 1
             wait_epochs: 0
 
             activation:
@@ -74,6 +75,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
+            #window_epochs: 1
             wait_epochs: 0
 
             activation:
@@ -84,14 +86,20 @@ embedding:
           channels: 3
 
           activation:
-            type: ease_out_value
-            end_value: 0.0
-            window_epochs: 5
-            wait_epochs: 5
+            type: tanh
+            outer_fac: 0.125
 
-            activation:
-              type: tanh
-              outer_fac: 0.125
+          #activation:
+          #  type: ease_out_value
+          #  end_value: 0.0
+          #  #window_epochs: 5
+          #  #wait_epochs: 5
+          #  #window_epochs: 1
+          #  #wait_epochs: 3
+
+          #  activation:
+          #    type: tanh
+          #    outer_fac: 0.125
 
       ray_outputs: # TODO: Remove
         color_scale:
@@ -218,6 +226,7 @@ embedding:
             type: ease_in_value
             start_value: 1.0
             window_epochs: 3
+            #window_epochs: 1
             wait_epochs: 0
 
             activation:

@@ -51,8 +51,12 @@ optimizers:
     decay_gamma: 0.125
 
     reset_opt_list: [4000, 6000, 8000, 10000, 12000]
-    skip_opt_list: [20000]
-    remove_skip_opt_list: [40000]
+    #skip_opt_list: [20000]
+    #remove_skip_opt_list: [40000]
+    #skip_opt_list: [4000]
+    #remove_skip_opt_list: [8000]
+    #skip_opt_list: [12000]
+    #remove_skip_opt_list: [20000]
 
   color_impl:
     optimizer: adam

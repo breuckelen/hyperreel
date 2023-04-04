@@ -267,9 +267,9 @@ embedding:
       in_points_field: points
       out_distance_field: distances
 
-    point_offset_0:
-      type: point_offset
-      use_sigma: True
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     #sort_outputs_0:
     #  type: sort_outputs
@@ -413,4 +413,5 @@ color:
     ## Shading
     shadingMode: RGB
     data_dim_color: 3
+
 
