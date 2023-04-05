@@ -47,9 +47,11 @@ class TensoRF(BaseRegularizer):
         self.update_AlphaMask_list = cfg.update_AlphaMask_list
 
         self.lr_factor = self.cfg.lr_decay_target_ratio ** (1 / self.cfg.n_iters)
+
         #self.total_num_tv_iters = self.cfg.total_num_tv_iters if 'total_num_tv_iters' in self.cfg else \
         #    int(np.round( (np.log(1e-4) / np.log(self.cfg.lr_decay_target_ratio)) * self.cfg.n_iters ))
-        self.total_num_tv_iters = -1
+        self.total_num_tv_iters = self.cfg.total_num_tv_iters if 'total_num_tv_iters' in self.cfg else -1
+        self.start_tv_falloff_iter = self.cfg.start_tv_falloff_iter if 'start_tv_falloff_iter' in self.cfg else -1
 
         self.L1_reg_weight = self.cfg.L1_weight_initial
         self.TV_weight_density = self.cfg.TV_weight_density
@@ -75,19 +77,21 @@ class TensoRF(BaseRegularizer):
             total_loss += self.L1_reg_weight * loss_reg_L1
 
         # Return if decayed TV enough
-        if self.cur_iter > self.total_num_tv_iters and self.total_num_tv_iters > 0:
+        if (self.cur_iter > self.total_num_tv_iters and self.total_num_tv_iters > 0):
             return total_loss
 
         # TV Loss
-        if self.TV_weight_density > 0:
+        if self.cur_iter > self.start_tv_falloff_iter:
             self.TV_weight_density *= self.lr_factor
+            self.TV_weight_app *= self.lr_factor
             self.TV_weight_density = max(self.TV_weight_density, self.TV_weight_density_rest)
+            self.TV_weight_app = max(self.TV_weight_app, self.TV_weight_app_rest)
+
+        if self.TV_weight_density > 0:
             loss_tv = tensorf.TV_loss_density(self.tvreg) * self.TV_weight_density
             total_loss = total_loss + loss_tv
 
         if self.TV_weight_app > 0:
-            self.TV_weight_app *= self.lr_factor
-            self.TV_weight_app = max(self.TV_weight_app, self.TV_weight_app_rest)
             loss_tv = loss_tv + tensorf.TV_loss_app(self.tvreg) * self.TV_weight_app
             total_loss = total_loss + loss_tv
 
@@ -96,6 +100,6 @@ class TensoRF(BaseRegularizer):
     def set_iter(self, iteration):
         super().set_iter(iteration)
 
-        if len(self.update_AlphaMask_list) > 0 and self.cur_iter == self.update_AlphaMask_list[0]:
+        if len(self.update_AlphaMask_list) > 0 and iteration == self.update_AlphaMask_list[0]:
             self.L1_reg_weight = self.cfg.L1_weight_rest
             print("continuing L1_reg_weight", self.L1_reg_weight)
