@@ -398,6 +398,12 @@ def from_ndc(t_p, rays, near):
     return t
 
 
+def to_ndc(t, rays, near):
+    t = t - (near - rays[..., None, 2]) / rays[..., None, 5]
+    t = 1.0 - 1.0 / (t * rays[..., 5, None] / near + 1.0)
+    return t
+
+
 def get_ray_density(sigma, ease_iters, cur_iter):
     if cur_iter >= ease_iters:
         return sigma

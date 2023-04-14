@@ -74,6 +74,10 @@ class IntersectZPlane(Intersect):
         self.use_local_prediction = cfg.use_local_prediction if 'use_local_prediction' in cfg else False
         self.voxel_size = cfg.voxel_size if 'voxel_size' in cfg else 1.0
 
+    def distance_to_z(self, rays, distance):
+        rays_o, rays_d = rays[..., None, :3], rays[..., None, 3:6]
+        return rays_o[..., 2:3] + rays_d[..., 2:3] * distance
+
     def intersect(self, rays, z_vals):
         z_vals = z_vals.view(z_vals.shape[0], -1)
 

@@ -31,7 +31,6 @@ weight_init:
 loss:
   type: mse
 
-# TensoRF
 sample_with_replacement: True
 num_iters: 4000
 num_epochs: 40

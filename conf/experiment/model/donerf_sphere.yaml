@@ -145,12 +145,6 @@ embedding:
           contract_samples: True
           use_dataset_bounds: True
 
-        #z_scale: 0.125
-
-        #activation:
-        #  type: identity
-        #  fac: 0.5
-
         activation:
           type: tanh
           inner_fac: 0.25

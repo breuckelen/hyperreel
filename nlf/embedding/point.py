@@ -749,6 +749,61 @@ class EpipolarOffsetEmbedding(nn.Module):
         self.cur_iter = i
 
 
+class ModulateOutputsEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        self.rays_name = cfg.rays_name if 'rays_name' in cfg else 'rays'
+        self.out_weights_field = cfg.out_weights_field if 'out_weights_field' in cfg else 'weights'
+
+        self.sigma_field = cfg.sigma_field if 'sigma_field' in cfg else 'sigma'
+        self.point_sigma_field = cfg.point_sigma_field if 'point_sigma_field' in cfg else 'point_sigma'
+
+        self.dist_p1_start = 0.5
+        #self.dist_p1_end = 1.0
+        self.dist_p1_end = 1.5
+
+        self.dist_p2_start = 0.5
+        #self.dist_p2_end = 1.0
+        self.dist_p2_end = 2.0
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        sigma = x[self.sigma_field] if self.sigma_field in x else 1.0
+        point_sigma = x[self.point_sigma_field] if self.point_sigma_field in x else 1.0
+
+        rays = x[self.rays_name]
+
+        # Calculate modulation weight
+        p1_dist = torch.sqrt(torch.square(rays[..., 0:2]).sum(-1) + 1e-8)
+        p2_dist = torch.sqrt(torch.square(rays[..., 3:5]).sum(-1) + 1e-8)
+
+        p1_weight = 1.0 - (p1_dist - self.dist_p1_start) / (self.dist_p1_end - self.dist_p1_start)
+        p2_weight = 1.0 - (p2_dist - self.dist_p2_start) / (self.dist_p2_end - self.dist_p2_start)
+
+        weight = p1_weight.clamp(0.0, 1.0) * p2_weight.clamp(0.0, 1.0)
+        print(weight.shape, weight.min(), weight.max(), weight.mean())
+
+        # Update weights
+        x[self.out_weights_field] = torch.ones_like(sigma)
+
+        # Update sigmas
+        x[self.sigma_field] = 1.0 - (1.0 - sigma) * weight[:, None, None]
+        x[self.point_sigma_field] = 1.0 - (1.0 - point_sigma) * weight[:, None, None]
+
+        return x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+
 class GenerateNumSamplesEmbedding(nn.Module):
     def __init__(
         self,
@@ -1280,6 +1335,7 @@ point_embedding_dict = {
     'sort_outputs': SortOutputsEmbedding,
     'damp_field': DampFieldEmbedding,
     'epipolar_offset': EpipolarOffsetEmbedding,
+    'modulate_outputs': ModulateOutputsEmbedding,
     'generate_samples': GenerateNumSamplesEmbedding,
     'select_points': SelectPointsEmbedding,
     'random_offset': RandomOffsetEmbedding,

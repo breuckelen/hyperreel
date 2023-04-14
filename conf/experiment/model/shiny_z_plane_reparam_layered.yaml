@@ -20,6 +20,18 @@ embedding:
 
       # Parameterization
       params:
+        points:
+          start: 0
+          end: 10
+
+          param:
+            fn: depth_layered
+            num_layers: 4
+
+          pe:
+            type: basic
+            n_freqs: 2
+
         ray:
           start: 0
           end: 6
@@ -81,7 +93,7 @@ embedding:
             type: tanh
             outer_fac: 0.25
 
-      ray_outputs:
+      ray_outputs: # TODO: Remove
         color_scale:
           channels: 3
 
@@ -112,9 +124,6 @@ embedding:
               inner_fac: 1.0
               outer_fac: 1.0
 
-    #modulate_outputs_0:
-    #  type: modulate_outputs
-
     ray_intersect_0:
       type: ray_intersect
 
@@ -140,9 +149,9 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
-    point_offset_0:
-      type: point_offset
-      use_sigma: True
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs
@@ -165,7 +174,10 @@ color:
 
     # Density activation
     fea2denseAct: relu
-    distance_scale: 16.0
+
+    #distance_scale: 16.0
+    distance_scale: 25.0
+
     density_shift: 0.0
 
     # Grid bounds
@@ -173,14 +185,17 @@ color:
 
     # Grid size and upsampling
     N_voxel_init: 2097152
-    N_voxel_final: 262144000
+    #N_voxel_init: 512000
+    #N_voxel_init: 64000
+
+    #N_voxel_final: 262144000
+    N_voxel_final: 512000000
 
     upsamp_list: [4000,6000,8000,10000,12000]
     lr_upsample_reset: True
 
     # Thresholding
     update_AlphaMask_list: [4000,8000]
-    #update_AlphaMask_list: []
     rm_weight_mask_thre: 0
     alpha_mask_thre: 1e-3
 
@@ -189,8 +204,15 @@ color:
     n_lamb_sh: [8,4,4]
 
     # Shading
-    shadingMode: RGB
-    data_dim_color: 3
+    #shadingMode: RGB
+    #data_dim_color: 3
+
+    shadingMode: MLP_Fea
+    data_dim_color: 27
+    view_pe: 0
+    fea_pe: 0
 
     #shadingMode: SH
     #data_dim_color: 27
+
+

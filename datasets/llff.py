@@ -30,6 +30,9 @@ class LLFFDataset(Base5DDataset):
         split='train',
         **kwargs
         ):
+
+        self.train_skip = cfg.dataset.train_skip if 'train_skip' in cfg.dataset else 1
+
         super().__init__(cfg, split, **kwargs)
 
     def read_meta(self):
@@ -119,6 +122,8 @@ class LLFFDataset(Base5DDataset):
 
         if self.val_all:
             val_indices = [i for i in train_indices] # noqa
+        
+        train_indices = train_indices[::self.train_skip]
 
         if self.split == 'val' or self.split == 'test':
             self.image_paths = [self.image_paths[i] for i in val_indices]
@@ -165,8 +170,8 @@ class LLFFDataset(Base5DDataset):
         else:
             rays_no_ndc = rays
         
-        # Add camera idx
-        rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * camera_id], dim=-1)
+        ## Add camera idx
+        #rays = torch.cat([rays, torch.ones_like(rays[..., :1]) * camera_id], dim=-1)
 
         ## Additional
         #rays = torch.cat([rays, rays_no_ndc], dim=-1)

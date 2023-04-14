@@ -59,7 +59,7 @@ class IdentityContract(BaseContract):
         super().__init__(cfg)
 
     def contract_points_and_distance(self, rays_o, points, distance):
-        return points, distance
+        return points, distance, rays_o
 
 
 class BBoxContract(BaseContract):

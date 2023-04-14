@@ -48,7 +48,8 @@ embedding:
         skips: [3]
 
       # Outputs
-      z_channels: 96
+      #z_channels: 96
+      z_channels: 192
 
       outputs:
         z_vals:
@@ -87,48 +88,18 @@ embedding:
             type: tanh
             outer_fac: 0.125
 
-        color_scale:
-          channels: 3
-
-          activation:
-            type: ease_in_value
-            start_value: 0.0
-            window_epochs: 0
-            wait_epochs: 0
-
-            activation:
-              type: identity
-              shift: 0.0
-              inner_fac: 1.0
-              outer_fac: 1.0
-
-        color_shift:
-          channels: 3
-
-          activation:
-            type: ease_in_value
-            start_value: 0.0
-            window_epochs: 0
-            wait_epochs: 0
-
-            activation:
-              type: identity
-              shift: 0.0
-              inner_fac: 1.0
-              outer_fac: 1.0
-
     ray_intersect_0:
       type: ray_intersect
 
       # Intersect
-      z_channels: 96
+      #z_channels: 96
+      z_channels: 192
 
       intersect:
         type: voxel_grid
 
         sort: True
-        #sort_outputs: [point_sigma, point_offset]
-        sort_outputs: [point_sigma, point_offset, color_scale, color_shift]
+        sort_outputs: [point_sigma, point_offset]
 
         use_sigma: True
 
@@ -172,25 +143,24 @@ color:
 
     # Density activation
     fea2denseAct: relu
-    distance_scale: 16.0
+    distance_scale: 25.0
     density_shift: 0.0
 
     # Grid bounds
     aabb: [[-2.0, -2.0, -2.0], [2.0, 2.0, 2.0]]
 
     # Grid size and upsampling
-    #N_voxel_init: 2097152
-    N_voxel_init: 512000
-    #N_voxel_final: 64000000
-    N_voxel_final: 216000000
-
+    #N_voxel_init: 512000
+    #N_voxel_final: 216000000
+    N_voxel_init: 2097156 # 128**3
+    N_voxel_final: 27000000 # 300**3
 
     upsamp_list: [4000,6000,8000,10000,12000]
     lr_upsample_reset: True
 
     # Thresholding
-    update_AlphaMask_list: []
-    #update_AlphaMask_list: [4000,8000]
+    #update_AlphaMask_list: []
+    update_AlphaMask_list: [4000,8000]
     rm_weight_mask_thre: 0
     alpha_mask_thre: 1e-3
 
@@ -199,8 +169,14 @@ color:
     n_lamb_sh: [8,8,8]
 
     # Shading
-    shadingMode: RGB
-    data_dim_color: 3
+    #shadingMode: RGB
+    #data_dim_color: 3
+
+    shadingMode: MLP_Fea
+    data_dim_color: 27
+    view_pe: 2
+    fea_pe: 2
+
     #shadingMode: SH
     #data_dim_color: 27
 

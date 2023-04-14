@@ -165,12 +165,14 @@ def create_spiral_poses(poses, rads, focal, N=120, flip=False):
     rots = 2
 
     render_poses = []
-    rads = np.array(list(rads) + [1.])
 
     for theta in np.linspace(0., 2. * np.pi * rots, N+1)[:-1]:
+        cur_rads = np.array(list(rads) + [1.])
+        #cur_rads[..., :3] = cur_rads[..., :3] * (theta / (2 * np.pi))
+
         c = np.dot(c2w[:3,:4], np.array(
             [np.cos(theta), -np.sin(theta), -np.sin(theta*0.5), 1.]
-            ) * rads
+            ) * cur_rads
         )
 
         if flip:

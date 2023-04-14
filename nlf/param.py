@@ -298,8 +298,9 @@ class DepthLayeredParam(nn.Module):
     ):
         super().__init__()
 
-        self.in_channels = cfg.in_channels if 'in_channels' in cfg else 8
-        self.out_channels = cfg.n_dims if 'n_dims' in cfg else 6
+        self.num_layers = cfg.num_layers if 'num_layers' in cfg else 1
+        self.in_channels = cfg.in_channels if 'in_channels' in cfg else 6 + self.num_layers
+        self.out_channels = 3 * self.num_layers
 
         self.origin = torch.tensor(cfg.origin if 'origin' in cfg else [0.0, 0.0, 0.0], device='cuda')
 
@@ -310,20 +311,13 @@ class DepthLayeredParam(nn.Module):
             )
         else:
             self.contract_fn = contract_dict['identity']({})
+        
+        print(self.out_channels)
 
     def forward(self, rays):
         rays_o, rays_d = rays[..., :3] - self.origin.unsqueeze(0), rays[..., 3:6]
-
-        depth_min = rays[..., 6:7]
-        depth_max = rays[..., 7:8]
-
-        points_min = rays_o + depth_min * rays_d
-        points_min = self.contract_fn.contract_points(points_min)
-
-        points_max = rays_o + depth_max * rays_d
-        points_max = self.contract_fn.contract_points(points_max)
-
-        return torch.cat([points_min, points_max], -1)
+        points = rays_o[..., None, :] + rays[..., 6:, None] * rays_d[..., None, :]
+        return points.view(rays.shape[0], self.out_channels)
 
     def set_iter(self, i):
         self.cur_iter = i
@@ -545,12 +539,9 @@ class RayParam(nn.Module):
         super().__init__()
 
         self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
-
         self.ray_param_fn = ray_param_dict[cfg.fn](cfg, **kwargs)
         self.in_channels = cfg.in_channels if 'in_channels' in cfg else 6
-        self.out_channels = cfg.n_dims if 'n_dims' in cfg else self.in_channels
-
-        self.dummy_layer = nn.Linear(1, 1)
+        self.out_channels = cfg.n_dims if 'n_dims' in cfg else self.ray_param_fn.out_channels
 
     def forward(self, x):
         return self.ray_param_fn(x)

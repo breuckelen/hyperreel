@@ -20,17 +20,31 @@ embedding:
 
       # Parameterization
       params:
+        points:
+          start: 0
+          end: 7
+
+          param:
+            n_dims: 3
+            fn: depth
+
+          pe:
+            type: basic
+            n_freqs: 2
+
         ray:
           start: 0
           end: 6
 
           param:
-            n_dims: 4
-            fn: two_plane
+            n_dims: 6
+            fn: pluecker
 
           pe:
-            type: basic
+            type: windowed
             n_freqs: 1
+            max_freq_epoch: 2
+            window_identity: 1
 
       # Net
       net:
@@ -165,7 +179,9 @@ color:
 
     # Density activation
     fea2denseAct: relu
+
     distance_scale: 16.0
+
     density_shift: 0.0
 
     # Grid bounds
@@ -180,7 +196,6 @@ color:
 
     # Thresholding
     update_AlphaMask_list: [4000,8000]
-    #update_AlphaMask_list: []
     rm_weight_mask_thre: 0
     alpha_mask_thre: 1e-3
 
@@ -192,5 +207,11 @@ color:
     shadingMode: RGB
     data_dim_color: 3
 
+    #shadingMode: MLP_Fea
+    #data_dim_color: 27
+    #view_pe: 0
+    #fea_pe: 0
+
     #shadingMode: SH
     #data_dim_color: 27
+

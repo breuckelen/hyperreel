@@ -81,7 +81,7 @@ class BasicWindowedPE(nn.Module):
 
         self.n_freqs = cfg.n_freqs
         self.cur_iter = 0
-        self.wait_iters = cfg.wait_iters
+        self.wait_iters = cfg.wait_iters if 'wait_iters' in cfg else 0
         self.max_freq_iter = float(cfg.max_freq_iter)
         self.exclude_identity = cfg.exclude_identity \
             if 'exclude_identity' in cfg \
@@ -139,7 +139,7 @@ class WindowedPE(nn.Module):
         self.funcs = [torch.sin, torch.cos]
 
         self.cur_iter = 0
-        self.wait_iters = cfg.wait_iters
+        self.wait_iters = cfg.wait_iters if 'wait_iters' in cfg else 0
         self.max_freq_iter = float(cfg.max_freq_iter)
 
         # PE
@@ -181,8 +181,6 @@ class WindowedPE(nn.Module):
                 self.window_iters = [(self.window_after * i + self.wait_iters, self.window_after * (i + 1) + self.wait_iters) \
                     for i in range(0, self.n_freqs)]
 
-        self.dummy_layer = nn.Linear(1, 1)
-
     def weight(self, j):
         cur_iter = (self.cur_iter - self.wait_iters)
 
@@ -211,8 +209,8 @@ class WindowedPE(nn.Module):
         out = []
 
         if not self.exclude_identity:
-            #out = [self.base_multiplier * self.weight(-1 + self.window_identity) * x]
-            out = [x]
+            out = [self.base_multiplier * self.weight(-1 + self.window_identity) * x]
+            #out = [x]
 
         for j, freq in enumerate(self.freq_bands):
             for func in self.funcs:
@@ -327,7 +325,7 @@ class WindowedRandomPE(nn.Module):
 
         # Windowing
         self.cur_iter = 0
-        self.wait_iters = cfg.wait_iters
+        self.wait_iters = cfg.wait_iters if 'wait_iters' in cfg else 0
         self.max_freq_iter = float(cfg.max_freq_iter)
 
         self.ceil = cfg.ceil \

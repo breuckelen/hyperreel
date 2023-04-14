@@ -66,6 +66,9 @@ class Intersect(nn.Module):
         # Input/output size
         self.z_channels = z_channels
         self.in_density_field = cfg.in_density_field if 'in_density_field' in cfg else 'sigma'
+        self.in_z_field = cfg.in_z_field if 'in_z_field' in cfg else 'z_vals'
+        self.last_z_field = cfg.last_z_field if 'last_z_field' in cfg else 'last_z'
+        self.last_distance_field = cfg.last_distance_field if 'last_distance_field' in cfg else 'last_distance'
 
         # Other common parameters
         self.forward_facing = cfg.forward_facing if 'forward_facing' in cfg else False
@@ -163,26 +166,21 @@ class Intersect(nn.Module):
             and self.cur_iter < self.dropout_stop_iter and self.training:
             z_vals = torch.zeros_like(z_vals)
 
-        #print(torch.abs(z_vals).mean()) # TODO: Remove
-        #print(torch.abs(z_vals.view(z_vals.shape[0], -1, 3)[..., -1]).mean()) # TODO: Remove
-
         # Add samples and contract
         z_vals = self.process_z_vals(z_vals)
-        #print(z_vals.view(z_vals.shape[0], -1, 4)[0])
 
         # Residual distances
         if self.residual_z:
-            if 'last_z' in x:
-                last_z = x['last_z']
-            elif 'last_distance' in x:
-                last_distance = x['last_distance']
-                #print(last_distance[0])
+            if self.last_z_field in x:
+                last_z = x[self.last_z_field]
+            elif self.last_distance_field in x:
+                last_distance = x[self.last_distance_field]
                 last_z = self.distance_to_z(rays, last_distance)
-                #print(last_z[0])
 
             z_vals = z_vals.view(
                 z_vals.shape[0], last_z.shape[1], -1, last_z.shape[-1]
             ) + last_z.unsqueeze(2)
+            
             z_vals = z_vals.view(z_vals.shape[0], -1)
 
         # Get distances
@@ -224,12 +222,12 @@ class Intersect(nn.Module):
 
         # Get intersect distances, valid mask
         dists, mask, z_vals = self.get_intersect_distances(
-            rays, x['z_vals'], x, render_kwargs
+            rays, x[self.in_z_field], x, render_kwargs
         )
 
         if self.sort_fixed or self.generate_offsets:
             dists_fixed, mask_fixed, z_vals_fixed = self.get_intersect_distances(
-                rays, torch.zeros_like(x['z_vals']), x, render_kwargs
+                rays, torch.zeros_like(x[self.in_z_field]), x, render_kwargs
             )
 
         # Sort

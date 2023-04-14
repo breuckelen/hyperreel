@@ -20,6 +20,18 @@ embedding:
 
       # Parameterization
       params:
+        points:
+          start: 0
+          end: 7
+
+          param:
+            n_dims: 3
+            fn: depth
+
+          pe:
+            type: basic
+            n_freqs: 2
+
         ray:
           start: 0
           end: 6
@@ -81,7 +93,7 @@ embedding:
             type: tanh
             outer_fac: 0.25
 
-      ray_outputs:
+      ray_outputs: # TODO: Remove
         color_scale:
           channels: 3
 
@@ -111,9 +123,6 @@ embedding:
               shift: 0.0
               inner_fac: 1.0
               outer_fac: 1.0
-
-    #modulate_outputs_0:
-    #  type: modulate_outputs
 
     ray_intersect_0:
       type: ray_intersect
@@ -157,40 +166,46 @@ color:
   type: base
 
   net:
-    type: tensor_vm_split_no_sample
+    type: ngp_rf
 
-    # Scene hyper-params
     white_bg: 0
     black_bg: 0
 
-    # Density activation
-    fea2denseAct: relu
-    distance_scale: 16.0
-    density_shift: 0.0
+    aabb: [-2.0, -2.0, -2.0, 2.0, 2.0, 2.0]
+    #aabb: [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]
 
-    # Grid bounds
-    aabb: [[-2.0, -2.0, -1.0], [2.0, 2.0, 1.0]]
+    num_dim: 3
 
-    # Grid size and upsampling
-    N_voxel_init: 2097152
-    N_voxel_final: 262144000
+    use_viewdirs: True
+    #use_viewdirs: False
 
-    upsamp_list: [4000,6000,8000,10000,12000]
-    lr_upsample_reset: True
+    hidden_dim: 64
+    geo_feat_dim: 15
 
-    # Thresholding
-    update_AlphaMask_list: [4000,8000]
-    #update_AlphaMask_list: []
-    rm_weight_mask_thre: 0
-    alpha_mask_thre: 1e-3
+    density_activation: relu
 
-    # Tensor sizes
-    n_lamb_sigma: [8,4,4]
-    n_lamb_sh: [8,4,4]
+    distance_scale: 8.0
 
-    # Shading
-    shadingMode: RGB
-    data_dim_color: 3
+    #window_epochs: 0
+    window_epochs: 1
 
-    #shadingMode: SH
-    #data_dim_color: 27
+    n_window_levels: 16
+    #n_window_levels: 8
+    #n_window_levels: 6
+
+    window_discrete: False
+    #window_discrete: True
+
+    #window_start_level: 8
+    window_start_level: 16
+
+    n_levels: 16
+
+    base_res: 16
+    #base_res: 32
+
+    max_res: 1024
+    #max_res: 2048
+
+    log2_hashmap_size: 16
+    #log2_hashmap_size: 19

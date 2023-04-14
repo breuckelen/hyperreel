@@ -16,16 +16,16 @@ lr_decay_target_ratio: 0.1
 
 n_iters: 30000
 
-#total_num_tv_iters: -1
-total_num_tv_iters: 120000
+total_num_tv_iters: -1
+#total_num_tv_iters: 120000
 
 start_tv_falloff_iter: -1
 #start_tv_falloff_iter: 120000
 
 lr_upsample_reset: True
 
-L1_weight_initial: 4e-5
-#L1_weight_initial: 8e-5
+#L1_weight_initial: 4e-5
+L1_weight_initial: 8e-5
 
 L1_weight_rest: 4e-5
 #L1_weight_rest: 0
@@ -33,8 +33,7 @@ L1_weight_rest: 4e-5
 TV_weight_density: 0.05
 TV_weight_app: 0.05
 
-TV_weight_density_rest: 0.05
-TV_weight_app_rest: 0.05
-#TV_weight_density_rest: 5e-3
-#TV_weight_app_rest: 5e-3
-
+#TV_weight_density_rest: 0.05
+#TV_weight_app_rest: 0.05
+TV_weight_density_rest: 5e-3
+TV_weight_app_rest: 5e-3

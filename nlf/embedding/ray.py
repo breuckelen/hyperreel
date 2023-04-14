@@ -23,6 +23,7 @@ from nlf.intersect import (
 from utils.intersect_utils import intersect_axis_plane
 
 import pytorch3d.transforms as transforms
+import copy
 
 
 class CalibratePlanarEmbedding(nn.Module):
@@ -363,6 +364,38 @@ class RayPredictionEmbedding(nn.Module):
                 pe.set_iter(i)
 
 
+class VolumeQueryEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # Rays
+        self.rays_name = cfg.rays_name if 'rays_name' in cfg else 'rays'
+
+        # Volume
+        self.volume_fn = net_dict[cfg.volume.type](
+            None,
+            None,
+            cfg.volume,
+            group=self.group
+        )
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        rays = x[self.rays_name]
+        return self.volume_fn(rays, x, render_kwargs)
+
+    def set_iter(self, i):
+        self.cur_iter = i
+        self.volume_fn.set_iter(i)
+
+
 class RayIntersectEmbedding(nn.Module):
     def __init__(
         self,
@@ -392,6 +425,144 @@ class RayIntersectEmbedding(nn.Module):
     def set_iter(self, i):
         self.cur_iter = i
         self.intersect_fn.set_iter(i)
+
+
+class RaySplitIntersectEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # Rays
+        self.rays_name = cfg.rays_name if 'rays_name' in cfg else 'rays'
+
+        # Intersect
+        self.intersect_cfg = self.cfg.intersect
+        self.intersect_names = list(self.cfg.intersect.keys())
+        self.intersect_fns = []
+        self.channels = []
+
+        for idx, intersect_name in enumerate(self.intersect_names):
+            cur_isect_cfg = self.intersect_cfg[intersect_name]
+            cur_z_channels = cur_isect_cfg.z_channels
+
+            self.intersect_fns.append(
+                intersect_dict[cur_isect_cfg.intersect.type](
+                    cur_z_channels, cur_isect_cfg.intersect, **kwargs
+                )
+            )
+
+            self.channels.append(
+                (cur_isect_cfg.start_channel, cur_isect_cfg.start_channel + cur_z_channels)
+            )
+
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        rays = x[self.rays_name]
+        output_x = {}
+
+        for idx, intersect_fn in enumerate(self.intersect_fns):
+            # Construct current x
+            start_channel, end_channel = self.channels[idx]
+            cur_x = {}
+
+            for key in x.keys():
+                if x[key].shape[1] > 0:
+                    cur_x[key] = x[key][:, start_channel:end_channel]
+                else:
+                    cur_x[key] = x[key]
+
+            # Intersect
+            cur_x = intersect_fn(rays, cur_x, render_kwargs)
+
+            # Add outputs
+            for key in cur_x.keys():
+                if key not in output_x:
+                    output_x[key] = cur_x[key]
+                else:
+                    output_x[key] = torch.cat([output_x[key], cur_x[key]], 1)
+        
+        return output_x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+        for idx, intersect_fn in enumerate(self.intersect_fns):
+            intersect_fn.set_iter(i)
+
+
+class RayMultipleIntersectEmbedding(nn.Module):
+    def __init__(
+        self,
+        in_channels,
+        cfg,
+        **kwargs
+    ):
+        super().__init__()
+
+        self.group = cfg.group if 'group' in cfg else (kwargs['group'] if 'group' in kwargs else 'embedding')
+        self.cfg = cfg
+
+        # Rays
+        self.rays_name = cfg.rays_name if 'rays_name' in cfg else 'rays'
+
+        # Intersect
+        self.intersect_cfg = self.cfg.intersect
+        self.intersect_names = list(self.cfg.intersect.keys())
+        self.intersect_fns = []
+
+        for idx, intersect_name in enumerate(self.intersect_names):
+            cur_isect_cfg = self.intersect_cfg[intersect_name]
+            cur_z_channels = cur_isect_cfg.z_channels
+
+            self.intersect_fns.append(
+                intersect_dict[cur_isect_cfg.intersect.type](
+                    cur_z_channels, cur_isect_cfg.intersect, **kwargs
+                )
+            )
+
+
+    def forward(self, x: Dict[str, torch.Tensor], render_kwargs: Dict[str, str]):
+        rays = x[self.rays_name]
+        output_x = {}
+
+        for idx, intersect_fn in enumerate(self.intersect_fns):
+            # Construct current x
+            cur_x = {}
+
+            for key in x:
+                if x[key].shape[1] > 1:
+                    new_key = '_'.join(key.split('_')[:-1])
+                else:
+                    new_key = key
+
+                cur_x[new_key] = x[key]
+
+            # Intersect
+            cur_x = intersect_fn(rays, cur_x, render_kwargs)
+
+            # Add outputs
+            for key in cur_x.keys():
+                new_key = '_'.join(key.split('_')[:-1])
+
+                if new_key not in output_x:
+                    output_x[new_key] = cur_x[key]
+                else:
+                    output_x[new_key] = torch.cat([output_x[new_key], cur_x[key]], 1)
+        
+        return output_x
+
+    def set_iter(self, i):
+        self.cur_iter = i
+
+        for idx, intersect_fn in enumerate(self.intersect_fns):
+            intersect_fn.set_iter(i)
 
 
 class CreateRaysEmbedding(nn.Module):
@@ -434,6 +605,9 @@ ray_embedding_dict = {
     'calibrate_planar': CalibratePlanarEmbedding,
     'calibrate': CalibrateEmbedding,
     'ray_prediction': RayPredictionEmbedding,
+    'volume_query': VolumeQueryEmbedding,
     'ray_intersect': RayIntersectEmbedding,
+    'ray_split_intersect': RaySplitIntersectEmbedding,
+    'ray_multiple_intersect': RayMultipleIntersectEmbedding,
     'create_rays': CreateRaysEmbedding,
 }

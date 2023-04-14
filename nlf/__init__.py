@@ -969,7 +969,7 @@ class INRSystem(LightningModule):
             depth = batch['depth']
 
             if depth.shape[-1] > 1:
-                depth = depth[..., -1:]
+                depth = depth[..., :1]
 
             depth = depth.view(H, W).cpu().numpy()
             all_images['eval/depth'] = depth / depth.max()

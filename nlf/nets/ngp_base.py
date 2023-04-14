@@ -143,6 +143,7 @@ class NGPRadianceField(torch.nn.Module):
         # NOTE: Windowing is new
         self.cur_iter = 0
         self.window_iters = cfg.window_iters if "window_iters" in cfg else 0.0
+        self.window_start_level = cfg.window_start_level if "window_start_level" in cfg else -1
 
         if self.window_iters > 0:
             self.n_window_levels = cfg.n_window_levels
@@ -172,8 +173,12 @@ class NGPRadianceField(torch.nn.Module):
 
         for l, cur_feat in enumerate(feat_split[1:]):
             window_start = self.window_iters_list[l+1]
-            #window_start = 0
-            window_end = self.window_iters_list[l+1] + self.window_iters_single
+
+            if self.window_start_level > 0 and l < self.window_start_level:
+                window_end = 0
+            else:
+                window_end = self.window_iters_list[l+1] + self.window_iters_single
+
             window_iters = window_end - window_start
 
             if self.cur_iter >= window_end:
@@ -300,12 +305,12 @@ class NGPRadianceField(torch.nn.Module):
 
         # Transform colors
         if 'color_scale' in x:
-            color_scale = x['color_scale'].view(rgb.shape[0], rgb.shape[1], 3)
-            color_shift = x['color_shift'].view(rgb.shape[0], rgb.shape[1], 3)
+            color_scale = x['color_scale'].view(rgb.shape[0], -1, 3)
+            color_shift = x['color_shift'].view(rgb.shape[0], -1, 3)
             rgb = scale_shift_color_all(rgb, color_scale, color_shift)
         elif 'color_transform' in x:
-            color_transform = x['color_transform'].view(rgb.shape[0], rgb.shape[1], 9)
-            color_shift = x['color_shift'].view(rgb.shape[0], rgb.shape[1], 3)
+            color_transform = x['color_transform'].view(rgb.shape[0], -1, 9)
+            color_shift = x['color_shift'].view(rgb.shape[0], -1, 3)
             rgb = transform_color_all(rgb, color_transform, color_shift)
 
         # Over composite

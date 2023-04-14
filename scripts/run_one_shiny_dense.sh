@@ -6,10 +6,10 @@
 
 CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=shiny_dense_large \
     experiment/training=shiny_tensorf \
-    experiment.training.val_every=10 \
+    experiment.training.val_every=5 \
     experiment.training.ckpt_every=10 \
     experiment.training.test_every=20 \
-    experiment.training.render_every=50 \
+    experiment.training.render_every=5 \
     ++experiment.training.num_epochs=100 \
     experiment/model=shiny_z_plane$3 \
     experiment.params.print_loss=True \
