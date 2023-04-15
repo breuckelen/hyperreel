@@ -26,7 +26,13 @@ embedding:
 
           param:
             n_dims: 6
-            fn: identity
+            fn: pluecker
+
+          pe:
+            type: windowed
+            n_freqs: 1
+            max_freq_epoch: 2
+            window_identity: 1
 
       # Net
       net:
@@ -37,6 +43,7 @@ embedding:
         hidden_channels: 256
         skips: [3]
 
+      #z_channels: 16
       z_channels: 32
       #z_channels: 64
       #z_channels: 128
@@ -48,6 +55,7 @@ embedding:
     ray_intersect_0:
       type: ray_intersect
 
+      #z_channels: 16
       z_channels: 32
       #z_channels: 64
       #z_channels: 128
@@ -67,6 +75,9 @@ embedding:
     point_prediction_0:
       type: point_prediction
 
+      #in_z_channels: 16
+      #net_in_z_channels: 16
+      #out_z_channels: 16
       in_z_channels: 32
       net_in_z_channels: 32
       out_z_channels: 32
@@ -105,8 +116,7 @@ embedding:
           pe:
             type: windowed
             n_freqs: 1
-            max_freq_epoch: 2
-            #max_freq_epoch: 0
+            max_freq_epoch: 0
             window_identity: 1
 
       net:
@@ -200,6 +210,7 @@ embedding:
       type: ray_intersect
 
       # Intersect
+      #z_channels: 16
       z_channels: 32
       #z_channels: 64
       #z_channels: 128
@@ -212,23 +223,23 @@ embedding:
 
         residual_z: True
 
-        #use_sigma: False
         use_sigma: True
 
         initial: 0.0
         end: 0.0
 
         z_scale: 0.0625
+        #z_scale: 0.03125
+        #z_scale: 0.015625
 
         activation:
           type: identity
           inner_fac: 0.25
           outer_fac: 4.0
 
-    point_offset_0:
-      type: point_offset
-      #use_sigma: False
-      use_sigma: True
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs
@@ -249,40 +260,26 @@ color:
     black_bg: 0
 
     aabb: [-2.0, -2.0, -2.0, 2.0, 2.0, 2.0]
-    #aabb: [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]
 
     num_dim: 3
 
     use_viewdirs: True
-    #use_viewdirs: False
 
     hidden_dim: 64
     geo_feat_dim: 15
+    n_features_per_level: 4
 
     density_activation: relu
 
     distance_scale: 25.0
 
-    window_epochs: 0
-    #window_epochs: 1
-
-    n_window_levels: 16
-    #n_window_levels: 8
-    #n_window_levels: 6
-
-    window_discrete: False
-    #window_discrete: True
-
-    #window_start_level: 8
-    window_start_level: 16
-
-    n_levels: 16
-
+    n_levels: 7
     base_res: 16
-    #base_res: 32
-
     max_res: 1024
-    #max_res: 2048
 
-    log2_hashmap_size: 16
-    #log2_hashmap_size: 19
+    #log2_hashmap_size: 16
+    log2_hashmap_size: 19
+
+    window_epochs: 2
+    n_window_levels: 7
+    window_start_level: 4

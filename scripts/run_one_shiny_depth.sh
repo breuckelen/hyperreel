@@ -14,6 +14,7 @@ CUDA_VISIBLE_DEVICES=$1 python main.py experiment/dataset=shiny_large \
     experiment/model=shiny_z_plane$3 \
     experiment.params.print_loss=True \
     experiment.dataset.collection=$2 \
+    +experiment.dataset.use_depth=True \
     +experiment/regularizers/tensorf=tv_4000 \
     experiment.params.name=shiny_$2$3 \
     +experiment/visualizers/embedding=default

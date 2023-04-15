@@ -168,9 +168,9 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
-    point_offset_0:
-      type: point_offset
-      use_sigma: True
+    #point_offset_0:
+    #  type: point_offset
+    #  use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs

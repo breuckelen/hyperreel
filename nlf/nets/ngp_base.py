@@ -64,6 +64,7 @@ class NGPRadianceField(torch.nn.Module):
 
         self.num_dim = cfg.num_dim
         self.n_levels = cfg.n_levels
+        self.n_features_per_level = cfg.n_features_per_level if 'n_features_per_level' in cfg else 2
         self.use_viewdirs = cfg.use_viewdirs
 
         # NOTE: Density activation is new
@@ -102,7 +103,7 @@ class NGPRadianceField(torch.nn.Module):
             encoding_config={
                 "otype": "HashGrid",
                 "n_levels": cfg.n_levels,
-                "n_features_per_level": 2,
+                "n_features_per_level": self.n_features_per_level,
                 "log2_hashmap_size": cfg.log2_hashmap_size,
                 "base_resolution": cfg.base_res,
                 "per_level_scale": per_level_scale,
@@ -146,8 +147,8 @@ class NGPRadianceField(torch.nn.Module):
         self.window_start_level = cfg.window_start_level if "window_start_level" in cfg else -1
 
         if self.window_iters > 0:
-            self.n_window_levels = cfg.n_window_levels
-            self.window_discrete = cfg.window_discrete
+            self.n_window_levels = cfg.n_window_levels if 'n_window_levels' in cfg else self.n_levels
+            self.window_discrete = cfg.window_discrete if 'window_discrete' in cfg else False
             self.window_iters_single = self.window_iters // self.n_window_levels
             self.window_iters_list = np.arange(0, self.window_iters, self.window_iters_single)
 
@@ -168,7 +169,7 @@ class NGPRadianceField(torch.nn.Module):
             or self.cur_iter >= self.window_iters_list[-1] + self.window_iters_single:
             return feat
 
-        feat_split = torch.split(feat, 2 * self.n_levels // self.n_window_levels , dim=-1)
+        feat_split = torch.split(feat, self.n_features_per_level * self.n_levels // self.n_window_levels , dim=-1)
         new_features = [feat_split[0]]
 
         for l, cur_feat in enumerate(feat_split[1:]):

@@ -1,7 +1,8 @@
 # @package _group_
 
-#batch_size: 32768
 batch_size: 16384
+#batch_size: 32768
+#batch_size: 65536
 
 ray_chunk: 32768
 net_chunk: 32768
@@ -22,9 +23,9 @@ num_gpus: 1
 
 multiscale: False
 scales: [4, 2, 1]
-scale_batch_sizes: [16384, 16384, 16384]
-scale_lrs: [1.0, 1.0, 1.0]
 scale_epochs: [0, 1, 2]
+scale_batch_sizes: [1024, 4096, 16384]
+scale_lrs: [1.0, 1.0, 1.0]
 
 weight_init:
   type: none
@@ -52,8 +53,7 @@ optimizers:
     decay_epoch: 100
     decay_gamma: 0.125
 
-    reset_opt_list: []
-    #reset_opt_list: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+    reset_opt_list: [4000, 8000, 12000]
 
   color_impl:
     optimizer: adam
@@ -70,8 +70,7 @@ optimizers:
     decay_epoch: 100
     decay_gamma: 0.125
 
-    reset_opt_list: []
-    #reset_opt_list: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+    reset_opt_list: [4000, 8000, 12000]
 
   embedding_impl:
     optimizer: adam
@@ -88,8 +87,7 @@ optimizers:
     decay_epoch: 50
     decay_gamma: 0.125
 
-    reset_opt_list: []
-    #reset_opt_list: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+    reset_opt_list: [4000, 8000, 12000]
 
 
   embedding_impl_large:
@@ -107,6 +105,5 @@ optimizers:
     decay_epoch: 50
     decay_gamma: 0.125
 
-    reset_opt_list: []
-    #reset_opt_list: [1000,2000,3000,4000,5000,6000,7000,8000,9000,10000,11000,12000]
+    reset_opt_list: [4000, 8000, 12000]
 

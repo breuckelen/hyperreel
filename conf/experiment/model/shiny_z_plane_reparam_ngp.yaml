@@ -37,12 +37,14 @@ embedding:
           end: 6
 
           param:
-            n_dims: 4
-            fn: two_plane
+            n_dims: 6
+            fn: pluecker
 
           pe:
-            type: basic
+            type: windowed
             n_freqs: 1
+            max_freq_epoch: 2
+            window_identity: 1
 
       # Net
       net:
@@ -93,7 +95,7 @@ embedding:
             type: tanh
             outer_fac: 0.25
 
-      ray_outputs: # TODO: Remove
+      ray_outputs:
         color_scale:
           channels: 3
 
@@ -172,40 +174,24 @@ color:
     black_bg: 0
 
     aabb: [-2.0, -2.0, -2.0, 2.0, 2.0, 2.0]
-    #aabb: [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]
 
     num_dim: 3
 
     use_viewdirs: True
-    #use_viewdirs: False
 
     hidden_dim: 64
     geo_feat_dim: 15
+    n_features_per_level: 4
 
     density_activation: relu
 
-    distance_scale: 8.0
+    distance_scale: 25.0
 
-    #window_epochs: 0
-    window_epochs: 1
-
-    n_window_levels: 16
-    #n_window_levels: 8
-    #n_window_levels: 6
-
-    window_discrete: False
-    #window_discrete: True
-
-    #window_start_level: 8
-    window_start_level: 16
-
-    n_levels: 16
-
+    n_levels: 7
     base_res: 16
-    #base_res: 32
-
     max_res: 1024
-    #max_res: 2048
+    log2_hashmap_size: 19
 
-    log2_hashmap_size: 16
-    #log2_hashmap_size: 19
+    window_epochs: 2
+    n_window_levels: 7
+    window_start_level: 4

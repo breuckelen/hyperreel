@@ -66,7 +66,8 @@ class ShinyDataset(LLFFDataset):
         split='train',
         **kwargs
         ):
-        self.faces_per_pixel = cfg.dataset.faces_per_pixel if 'faces_per_pixel' in cfg.dataset else 4
+        self.faces_per_pixel = cfg.dataset.faces_per_pixel if 'faces_per_pixel' in cfg.dataset else 1
+        self.use_depth = cfg.dataset.use_depth if 'use_depth' in cfg.dataset else False
 
         super().__init__(cfg, split, **kwargs)
 
@@ -158,10 +159,11 @@ class ShinyDataset(LLFFDataset):
             + torch.tensor(self.poses_avg[:3, -1:]).float()
         verts = verts.permute(1, 0)
 
-        meshes = pytorch3d.structures.Meshes(verts=[verts], faces=[faces])
-        self.image_size = (self.img_wh[1], self.img_wh[0])
-        self.meshes = meshes.cuda()
-        self.meshes.textures = TexturesVertex(torch.ones_like(self.meshes.verts_packed())[None])
+        if self.use_depth:
+            meshes = pytorch3d.structures.Meshes(verts=[verts], faces=[faces])
+            self.image_size = (self.img_wh[1], self.img_wh[0])
+            self.meshes = meshes.cuda()
+            self.meshes.textures = TexturesVertex(torch.ones_like(self.meshes.verts_packed())[None])
 
         # Step 3: Ray directions for all pixels
         self.centered_pixels = True
@@ -197,6 +199,9 @@ class ShinyDataset(LLFFDataset):
             self.poses = self.poses[train_indices]
     
     def get_depth(self, idx):
+        if not self.use_depth:
+            return torch.zeros_like(self.directions.view(-1, 3)[..., 0:1].repeat(1, self.faces_per_pixel))
+
         # Convert pose
         pose = np.eye(4)
         pose[:3, :4] = self.poses[idx]

@@ -30,11 +30,8 @@ embedding:
 
           pe:
             type: windowed
-            freq_multiplier: 2.0
             n_freqs: 1
-            wait_iters: 0
             max_freq_epoch: 0
-            exclude_identity: False
 
       # Net
       net:
@@ -85,7 +82,7 @@ embedding:
             type: tanh
             outer_fac: 0.25
 
-      ray_outputs: # TODO: Remove
+      ray_outputs:
         color_scale:
           channels: 3
 
@@ -141,9 +138,9 @@ embedding:
           inner_fac: 0.25
           outer_fac: 4.0
 
-    #point_offset_0:
-    #  type: point_offset
-    #  use_sigma: True
+    point_offset_0:
+      type: point_offset
+      use_sigma: True
 
     add_point_outputs_0:
       type: add_point_outputs
@@ -164,42 +161,24 @@ color:
     black_bg: 0
 
     aabb: [-2.0, -2.0, -2.0, 2.0, 2.0, 2.0]
-    #aabb: [-1.5, -1.5, -1.5, 1.5, 1.5, 1.5]
 
     num_dim: 3
 
-    #use_viewdirs: True
-    use_viewdirs: False
+    use_viewdirs: True
 
     hidden_dim: 64
     geo_feat_dim: 15
+    n_features_per_level: 4
 
-    #density_activation: trunc_exp
     density_activation: relu
 
-    #distance_scale: 0.1
-    #distance_scale: 0.05
-    #distance_scale: 1.0
-    distance_scale: 8.0
+    distance_scale: 25.0
 
-    #window_epochs: 0
-    window_epochs: 4
-
-    n_window_levels: 8
-    #n_window_levels: 4
-
-    window_discrete: False
-
-    #n_levels: 16
-    n_levels: 16
-
-    max_res: 1024
-    #max_res: 800
-    #max_res: 512
-
+    n_levels: 7
     base_res: 16
-    #base_res: 80
+    max_res: 1024
+    log2_hashmap_size: 19
 
-    #log2_hashmap_size: 19
-    log2_hashmap_size: 16
-    #log2_hashmap_size: 14
+    window_epochs: 2
+    n_window_levels: 7
+    window_start_level: 4
