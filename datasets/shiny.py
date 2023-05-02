@@ -152,14 +152,14 @@ class ShinyDataset(LLFFDataset):
         #exit()
 
         # Load point cloud
-        verts, faces = pytorch3d.io.load_ply(os.path.join(self.root_dir, 'dense/sparse/fused.ply'))
-
-        verts = verts / scale_factor
-        verts = torch.tensor(self.poses_avg[:3, :3]).float() @ verts.permute(1, 0) \
-            + torch.tensor(self.poses_avg[:3, -1:]).float()
-        verts = verts.permute(1, 0)
-
         if self.use_depth:
+            verts, faces = pytorch3d.io.load_ply(os.path.join(self.root_dir, 'dense/sparse/fused.ply'))
+
+            verts = verts / scale_factor
+            verts = torch.tensor(self.poses_avg[:3, :3]).float() @ verts.permute(1, 0) \
+                + torch.tensor(self.poses_avg[:3, -1:]).float()
+            verts = verts.permute(1, 0)
+
             meshes = pytorch3d.structures.Meshes(verts=[verts], faces=[faces])
             self.image_size = (self.img_wh[1], self.img_wh[0])
             self.meshes = meshes.cuda()
